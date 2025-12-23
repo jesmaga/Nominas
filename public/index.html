@@ -1899,41 +1899,101 @@
             });
 
             const importFileInput = document.getElementById('import-file-input');
-            document.getElementById('importar-datos').addEventListener('click', () => importFileInput.click());
+            const btnImportar = document.getElementById('importar-datos');
+
+            if (btnImportar) {
+                btnImportar.addEventListener('click', () => importFileInput.click());
+            }
 
             importFileInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
                         const data = JSON.parse(e.target.result);
-                        if (data.puestos && data.empleados && data.configSS && data.conceptos && data.empresa && data.tiposContrato) {
+
+                        // Verificamos que tenga una estructura mínima
+                        if (data.puestos || data.empleados || data.configSS) {
+                            
                             showModal({
-                                title: 'Confirmar Importación',
-                                message: 'Esto reemplazará todos los datos actuales. ¿Estás seguro?',
+                                title: 'Confirmar Importación a la Nube',
+                                message: 'Se van a subir estos datos a la base de datos. Este proceso puede tardar unos segundos. ¿Continuar?',
                                 type: 'confirm',
-                                onConfirm: () => {
-                                    saveToStorage('puestos', data.puestos);
-                                    saveToStorage('empleados', data.empleados);
-                                    localStorage.setItem('configSS', JSON.stringify(data.configSS));
-                                    localStorage.setItem('conceptos', JSON.stringify(data.conceptos));
-                                    puestos = data.puestos; empleados = data.empleados; configSS = data.configSS; conceptos = data.conceptos;
-                                    saveToStorage('empresa', data.empresa);
-                                    empresa = data.empresa;
-                                    saveToStorage('tiposContrato', data.tiposContrato);
-                                    tiposContrato = data.tiposContrato;
-                                    init();
-                                    showModal({ title: 'Éxito', message: 'Datos importados correctamente.' });
+                                onConfirm: async () => {
+                                    // Feedback visual simple
+                                    const originalText = btnImportar ? btnImportar.innerText : '';
+                                    if(btnImportar) {
+                                        btnImportar.innerText = "Subiendo datos... Espere";
+                                        btnImportar.disabled = true;
+                                    }
+
+                                    try {
+                                        // 1. IMPORTAR CONFIGURACIONES
+                                        if (data.empresa) await fetch('/api/config/empresa', { method: 'POST', headers: {'Content-Type': 'json'}, body: JSON.stringify(data.empresa) });
+                                        if (data.configSS) await fetch('/api/config/ss', { method: 'POST', headers: {'Content-Type': 'json'}, body: JSON.stringify(data.configSS) });
+                                        if (data.conceptos) await fetch('/api/config/conceptos', { method: 'POST', headers: {'Content-Type': 'json'}, body: JSON.stringify(data.conceptos) });
+                                        if (data.tiposContrato) await fetch('/api/config/contratos', { method: 'POST', headers: {'Content-Type': 'json'}, body: JSON.stringify(data.tiposContrato) });
+
+                                        // 2. IMPORTAR PUESTOS (Uno a uno)
+                                        if (Array.isArray(data.puestos)) {
+                                            for (const puesto of data.puestos) {
+                                                await fetch('/api/puestos', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(puesto)
+                                                });
+                                            }
+                                        }
+
+                                        // 3. IMPORTAR EMPLEADOS (Uno a uno)
+                                        if (Array.isArray(data.empleados)) {
+                                            for (const emp of data.empleados) {
+                                                await fetch('/api/empleados', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(emp)
+                                                });
+                                            }
+                                        }
+
+                                        // 4. IMPORTAR USUARIOS (Opcional, saltando admin)
+                                        const usuariosImportar = data.users || data.usuarios;
+                                        if (Array.isArray(usuariosImportar)) {
+                                            for (const u of usuariosImportar) {
+                                                if(u.username !== 'admin') {
+                                                    await fetch('/api/usuarios', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(u)
+                                                    });
+                                                }
+                                            }
+                                        }
+
+                                        // Al terminar, recargamos los datos DE LA NUBE a la pantalla
+                                        await loadDataFromDB();
+                                        
+                                        showModal({ title: 'Éxito', message: 'Datos migrados a la Base de Datos correctamente.' });
+
+                                    } catch (err) {
+                                        console.error(err);
+                                        showModal({ title: 'Error', message: 'Hubo un fallo subiendo los datos: ' + err.message });
+                                    } finally {
+                                        if(btnImportar) {
+                                            btnImportar.innerText = originalText || "Importar JSON";
+                                            btnImportar.disabled = false;
+                                        }
+                                        importFileInput.value = '';
+                                    }
                                 }
                             });
                         } else {
-                            showModal({ title: 'Error', message: 'El archivo no tiene el formato correcto.' });
+                            showModal({ title: 'Error', message: 'El archivo no parece tener el formato correcto.' });
                         }
                     } catch (error) {
                         showModal({ title: 'Error', message: 'Error al leer el archivo JSON.' });
-                    } finally {
-                        importFileInput.value = '';
                     }
                 };
                 reader.readAsText(file);
