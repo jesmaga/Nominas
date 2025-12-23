@@ -25,15 +25,23 @@ const initDB = async () => {
     try {
         const client = await pool.connect();
 
-        // 1. Tabla Nóminas
+        // 1. Tabla Nóminas (REFACTORIZADA)
+        // Borramos tabla antigua para migración (Según requerimiento)
+        await client.query('DROP TABLE IF EXISTS nominas');
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS nominas (
                 id SERIAL PRIMARY KEY,
-                empleado_nombre TEXT,
-                dni TEXT,
-                periodo_inicio DATE,
-                periodo_fin DATE,
-                neto NUMERIC,
+                empleado_id TEXT,
+                anio INTEGER,
+                mes INTEGER,
+                dias_cotizados NUMERIC(10,2),
+                base_cc NUMERIC(10,2),
+                base_cp NUMERIC(10,2),
+                base_irpf NUMERIC(10,2),
+                cuota_irpf NUMERIC(10,2),
+                total_devengado NUMERIC(10,2),
+                liquido_percibir NUMERIC(10,2),
                 datos_completo JSONB,
                 fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -215,10 +223,28 @@ app.post('/api/config/:id', async (req, res) => {
 app.post('/api/guardar', async (req, res) => {
     const { empleado, periodo, nomina } = req.body;
     try {
+        const values = [
+            empleado.id,
+            parseInt(periodo.anio),
+            parseInt(periodo.mes),
+            parseFloat(nomina.diasCotizados || 0),
+            parseFloat(nomina.baseContingenciasComunes || 0),
+            parseFloat(nomina.baseContingenciasProfesionales || 0),
+            parseFloat(nomina.baseIRPF || 0),
+            parseFloat(nomina.cuotaIRPF || 0),
+            parseFloat(nomina.totalDevengado || 0),
+            parseFloat(nomina.salarioNeto || 0),
+            JSON.stringify(req.body)
+        ];
+
         await pool.query(`
-            INSERT INTO nominas (empleado_nombre, dni, periodo_inicio, periodo_fin, neto, datos_completo)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        `, [empleado.nombre, empleado.dni, periodo.inicio, periodo.fin, nomina.salarioNeto, JSON.stringify(req.body)]);
+            INSERT INTO nominas (
+                empleado_id, anio, mes, dias_cotizados, 
+                base_cc, base_cp, base_irpf, cuota_irpf, 
+                total_devengado, liquido_percibir, datos_completo
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `, values);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
