@@ -1662,6 +1662,7 @@
                     listaEmpleados.appendChild(tr);
                 });
                 lucide.createIcons();
+            };
                 const resetFormEmpleado = () => {
                     formEmpleado.reset();
                     empleadoIdInput.value = '';
@@ -3800,59 +3801,13 @@
                             showPage(targetId);
                         });
                     });
-                } // <--- Esta llave cierra la función init()
 
-            }
-            // --- CÓDIGO DEL BOTÓN GUARDAR EN NUBE (MOVIDO AQUÍ DENTRO) ---
-            const btnGuardarNeon = document.getElementById('btn-guardar-neon');
+                } // <--- Cierre de la función init()
 
-            // Referencia segura a la función display
-            const originalDisplay = typeof displayNominaResult !== 'undefined' ? displayNominaResult : null;
+                // Arrancamos la aplicación
+                init();
 
-            // Sobrescribimos la función para que muestre el botón
-            displayNominaResult = function (nomina, empleado) {
-                if (originalDisplay) originalDisplay(nomina, empleado);
-                if (btnGuardarNeon) btnGuardarNeon.style.display = 'inline-flex';
-            };
-
-            if (btnGuardarNeon) {
-                btnGuardarNeon.addEventListener('click', async () => {
-                    // Usamos la variable global 'ultimaNominaCalculada'
-                    if (typeof ultimaNominaCalculada === 'undefined' || !ultimaNominaCalculada) return;
-
-                    const originalText = btnGuardarNeon.innerHTML;
-                    btnGuardarNeon.textContent = 'Guardando...';
-                    btnGuardarNeon.disabled = true;
-
-                    try {
-                        const response = await fetch('/api/guardar', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(ultimaNominaCalculada)
-                        });
-
-                        const data = await response.json();
-
-                        if (data.success) {
-                            alert("✅ Nómina guardada en la base de datos correctamente.");
-                        } else {
-                            alert("❌ Error: " + data.error);
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert("Error de conexión con el servidor.");
-                    } finally {
-                        btnGuardarNeon.innerHTML = originalText;
-                        btnGuardarNeon.disabled = false;
-                    }
-                });
-            }
-
-            // Llamamos a init() aquí, DENTRO del bloque principal
-            init();
-
-        }); // <--- ESTA es la llave que cierra el DOMContentLoaded. ¡No borres esta!
+        }); // <--- Cierre del DOMContentLoaded
     </script>
 </body>
-
 </html>
