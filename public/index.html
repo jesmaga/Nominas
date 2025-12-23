@@ -3661,18 +3661,18 @@
                 btnGuardarIndividualBd.addEventListener('click', async () => {
                     if (!ultimaNominaCalculada) return;
 
-                    // Parseamos la fecha de inicio (formato YYYY-MM-DD)
+                    // Parseamos la fecha de inicio
                     const fechaObj = new Date(ultimaNominaCalculada.periodo.inicio);
 
-                    // Corregimos los datos antes de enviarlos
-                    ultimaNominaCalculada.mes = fechaObj.getMonth() + 1; // getMonth() devuelve 0-11, sumamos 1
-                    ultimaNominaCalculada.anio = fechaObj.getFullYear();
-
-                    // Validación de seguridad por si la fecha es inválida
-                    if (isNaN(ultimaNominaCalculada.mes) || isNaN(ultimaNominaCalculada.anio)) {
-                        showModal({ title: "Error", message: "La fecha de la nómina no es válida. Revisa las fechas de inicio." });
+                    // --- CORRECCIÓN: Validación de Fecha ---
+                    if (isNaN(fechaObj.getTime())) {
+                        showModal({ title: "Error", message: "La fecha de inicio es inválida. No se puede determinar el mes y año para la base de datos." });
                         return;
                     }
+
+                    // Asignación segura
+                    ultimaNominaCalculada.mes = fechaObj.getMonth() + 1; 
+                    ultimaNominaCalculada.anio = fechaObj.getFullYear();
 
                     const originalText = btnGuardarIndividualBd.innerHTML;
                     btnGuardarIndividualBd.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando...';
@@ -3687,13 +3687,13 @@
                         const result = await response.json();
 
                         if (result.success) {
-                            showModal({ title: "Éxito", message: "Nómina guardada en la base de datos correctamente." });
+                            showModal({ title: "Éxito", message: "Nómina guardada correctamente." });
                         } else {
                             throw new Error(result.error);
                         }
                     } catch (error) {
                         console.error(error);
-                        showModal({ title: "Error", message: "Error al guardar la nómina: " + error.message });
+                        showModal({ title: "Error", message: "Error al guardar: " + error.message });
                     } finally {
                         btnGuardarIndividualBd.innerHTML = originalText;
                         btnGuardarIndividualBd.disabled = false;
@@ -3720,22 +3720,23 @@
                     for (let i = 0; i < ultimoCalculo.length; i++) {
                         const item = ultimoCalculo[i];
 
-                        // 1. VERIFICACIÓN DE SEGURIDAD "NaN"
-                        // Si el total devengado es "NaN" (string), el cálculo falló por fechas inválidas.
-                        if (item.nomina.totalDevengos === "NaN" || isNaN(parseFloat(item.nomina.totalDevengos))) {
-                            console.error(`Omitiendo ${item.empleado.nombre}: Cálculo inválido (NaN). Revisa fechas.`);
+                        // --- CORRECCIÓN 1: Validar que el cálculo matemático fue exitoso ---
+                        if (item.nomina.error || isNaN(parseFloat(item.nomina.totalDevengos))) {
+                            console.error(`Omitiendo ${item.empleado.nombre}: Cálculo inválido o con errores.`);
                             errores++;
                             continue;
                         }
 
-                        // 2. CALCULAR MES Y AÑO SEGURO
+                        // --- CORRECCIÓN 2: Validar fechas para evitar NaN en mes/anio ---
                         const fechaObj = new Date(item.periodo.inicio);
-                        // Validar que la fecha sea real
+                        
+                        // Verificamos si la fecha es válida
                         if (isNaN(fechaObj.getTime())) {
+                            console.error(`Omitiendo ${item.empleado.nombre}: Fecha de inicio inválida.`);
                             errores++;
                             continue;
                         }
-                        
+
                         const mesCalculado = fechaObj.getMonth() + 1;
                         const anioCalculado = fechaObj.getFullYear();
 
@@ -3746,7 +3747,7 @@
                             const payload = {
                                 empleado: item.empleado,
                                 periodo: item.periodo,
-                                nomina: item.nomina, // Aquí van los importes
+                                nomina: item.nomina, 
                                 mes: mesCalculado,   
                                 anio: anioCalculado
                             };
@@ -3759,7 +3760,10 @@
                             
                             const result = await response.json();
                             if (result.success) guardados++;
-                            else errores++;
+                            else {
+                                console.error("Error backend:", result.error);
+                                errores++;
+                            }
 
                         } catch (error) {
                             console.error(error);
@@ -3773,7 +3777,7 @@
 
                     showModal({
                         title: "Proceso Finalizado",
-                        message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores/Omitidos: ${errores}\n\nNota: Si hubo errores, revisa que las fechas de inicio/fin sean válidas.`
+                        message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores/Omitidos: ${errores}`
                     });
                 });
             }

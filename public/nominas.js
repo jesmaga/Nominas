@@ -10,6 +10,11 @@ function calcularNomina(empleado, puesto, configSS, fechaInicio, fechaFin, fecha
     }
     const inicioPeriodo = new Date(fechaInicio + 'T00:00:00');
     const finPeriodo = new Date(fechaFin + 'T00:00:00');
+
+    if (isNaN(inicioPeriodo.getTime()) || isNaN(finPeriodo.getTime())) {
+        return { error: "Las fechas proporcionadas no son válidas." };
+    }
+    
     if (inicioPeriodo > finPeriodo) {
         return { error: "La fecha de inicio no puede ser posterior a la fecha de fin." };
     }
