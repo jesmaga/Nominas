@@ -262,22 +262,53 @@ app.get('/api/nominas/base-anterior', async (req, res) => {
 });
 
 app.post('/api/guardar', async (req, res) => {
-    const { empleado, periodo, nomina } = req.body;
+    // 1. Extraemos también 'mes' y 'anio' del cuerpo de la petición
+    const { empleado, periodo, nomina, mes, anio } = req.body;
+    
     try {
+        // 2. Lógica de Fallback de seguridad:
+        // Intentamos leer el año/mes enviados explícitamente.
+        // Si no existen, intentamos leerlos del objeto periodo.
+        // Si no existen, intentamos extraerlos de la fecha de inicio del periodo.
+        let anioFinal = parseInt(anio);
+        let mesFinal = parseInt(mes);
+
+        // Si falló lo anterior (es NaN), intentamos sacarlo del objeto periodo antiguo
+        if (isNaN(anioFinal) && periodo && periodo.anio) anioFinal = parseInt(periodo.anio);
+        if (isNaN(mesFinal) && periodo && periodo.mes) mesFinal = parseInt(periodo.mes);
+
+        // Si SIGUE siendo NaN, intentamos parsear la fecha string "YYYY-MM-DD"
+        if ((isNaN(anioFinal) || isNaN(mesFinal)) && periodo && periodo.inicio) {
+            const fechaObj = new Date(periodo.inicio);
+            if (!isNaN(fechaObj.getTime())) {
+                anioFinal = fechaObj.getFullYear();
+                mesFinal = fechaObj.getMonth() + 1;
+            }
+        }
+
+        // 3. ULTIMA DEFENSA: Si sigue siendo NaN, detenemos todo para no romper la BD
+        if (isNaN(anioFinal) || isNaN(mesFinal)) {
+            console.error("Error backend: Mes o Año son NaN", req.body);
+            return res.status(400).json({ error: "No se pudo determinar el Mes o Año de la nómina. Verifique las fechas." });
+        }
+
         const values = [
             empleado.id,
-            parseInt(periodo.anio),
-            parseInt(periodo.mes),
+            anioFinal, // Usamos la variable calculada y limpia
+            mesFinal,  // Usamos la variable calculada y limpia
             parseFloat(nomina.diasCotizados || 0),
-            parseFloat(nomina.baseContingenciasComunes || 0),
+            parseFloat(nomina.baseContingenciasComunes || 0), // OJO: Asegúrate que el frontend manda este nombre exacto o usa nomina.baseCotizacion
             parseFloat(nomina.baseContingenciasProfesionales || 0),
             parseFloat(nomina.baseIRPF || 0),
-            parseFloat(nomina.cuotaIRPF || 0),
-            parseFloat(nomina.totalDevengado || 0),
+            parseFloat(nomina.cuotaIRPF || nomina.deduccionIRPF || 0), // Fallback por si cambia el nombre
+            parseFloat(nomina.totalDevengado || nomina.totalDevengos || 0),
             parseFloat(nomina.salarioNeto || 0),
             JSON.stringify(req.body)
         ];
 
+        // Mapeo de campos corregido para coincidir con tu esquema de BD:
+        // base_cc, base_cp, base_irpf, cuota_irpf, total_devengado, liquido_percibir
+        
         await pool.query(`
             INSERT INTO nominas (
                 empleado_id, anio, mes, dias_cotizados, 
@@ -286,8 +317,12 @@ app.post('/api/guardar', async (req, res) => {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, values);
+        
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) { 
+        console.error("Error SQL:", e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 app.get('/api/historial', async (req, res) => {
