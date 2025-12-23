@@ -2439,6 +2439,9 @@
                 if (tramos.length === 0) return null;
 
                 const brutoAnual = brutoMensual * pagas;
+                // En España hay una reducción general por gastos de trabajo de 2.000€
+                const gastosGenerales = 0; 
+                const baseImponible = Math.max(0, brutoAnual - gastosGenerales);
 
                 // --- PASO 1: Calcular Mínimo Personal y Familiar ---
                 let minimoPersonalFamiliar = minParams.contribuyente;
@@ -2456,8 +2459,9 @@
 
                     const totalAsc = ascendientes * minParams.ascendiente;
                     const totalDisc = (disc >= 33) ? minParams.discapacidad : 0;
-                    // Si es > 65% a veces se dobla, pero mantenemos simple segun prompt
-
+                    
+                    // Incremento por discapacidad severa o ascendientes (simplificado)
+                    
                     minimoPersonalFamiliar += totalHijos + totalAsc + totalDisc;
 
                     if (hijos > 0 || ascendientes > 0 || disc > 0) {
@@ -2465,10 +2469,22 @@
                     }
                 }
 
+                // --- NUEVA REGLA DE EXCLUSIÓN ---
+                // Si la Base Imponible (Ingresos - 2000) no supera el mínimo personal y familiar,
+                // la retención es legalmente 0%.
+                if (baseImponible <= minimoPersonalFamiliar) {
+                     return {
+                        tipo: "0.00",
+                        c1: "0.00",
+                        c2: "0.00",
+                        minimo: minimoPersonalFamiliar,
+                        info: infoFam + " (Exento / Bajo Mínimo)"
+                    };
+                }
+
                 // --- PASO 2: Función auxiliar cálculo cuota ---
                 const calcularCuota = (base, _tramos) => {
                     let cuota = 0;
-                    // Asegurar orden
                     const tramosOrdenados = [..._tramos].sort((a, b) => a.desde - b.desde);
 
                     for (const t of tramosOrdenados) {
@@ -2484,8 +2500,9 @@
                     return cuota;
                 };
 
-                // --- PASO 3: Calcular Cuota 1 (Sobre Bruto) y Cuota 2 (Sobre Mínimo) ---
-                const cuota1 = calcularCuota(brutoAnual, tramos);
+                // --- PASO 3: Calcular Cuota 1 (Sobre Base) y Cuota 2 (Sobre Mínimo) ---
+                // Aplicamos las tablas a la base (Bruto - Gastos) y al Mínimo
+                const cuota1 = calcularCuota(baseImponible, tramos);
                 const cuota2 = calcularCuota(minimoPersonalFamiliar, tramos);
 
                 // --- PASO 4: Cuota Líquida ---
