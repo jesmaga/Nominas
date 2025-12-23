@@ -3669,6 +3669,7 @@
 
                 // --- LISTENERS DE GUARDADO EN BASE DE DATOS ---
 
+                const btnGuardarIndividualBd = document.getElementById('btn-guardar-individual-bd');
                 // 1. Guardado Individual
                 if (btnGuardarIndividualBd) {
                     btnGuardarIndividualBd.addEventListener('click', async () => {
@@ -3703,6 +3704,8 @@
                 }
 
                 // 2. Guardado Lote
+                const btnGuardarLoteBd = document.getElementById('btn-guardar-lote-bd');
+
                 if (btnGuardarLoteBd) {
                     btnGuardarLoteBd.addEventListener('click', async () => {
                         if (!ultimoCalculo || ultimoCalculo.length === 0) return;
