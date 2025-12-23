@@ -2596,66 +2596,43 @@
 
             // --- NUEVO: Listener para resetear el formulario al cambiar de empleado ---
             nominaEmpleadoSelect.addEventListener('change', () => {
-                // 1. Resetear fechas
                 setDefaultNominaDates();
+                
+                // Limpieza segura de campos
+                const idsALimpiar = ['nomina-baja-inicio', 'nomina-baja-fin', 'otros-devengos-container', 'otras-deducciones-container', 'nomina-resultado'];
+                idsALimpiar.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) (el.value !== undefined ? el.value = '' : el.innerHTML = '');
+                });
 
-                // 2. Limpiar campos
-                const inputBajaInicio = document.getElementById('nomina-baja-inicio');
-                const inputBajaFin = document.getElementById('nomina-baja-fin');
-                if (inputBajaInicio) inputBajaInicio.value = '';
-                if (inputBajaFin) inputBajaFin.value = '';
-
-                // 3. Resetear IRPF
                 const inputIrpf = document.getElementById('nomina-irpf');
                 if (inputIrpf) inputIrpf.value = '0.00';
 
-                // 4. Limpiar contenedores
-                const containerDevengos = document.getElementById('otros-devengos-container');
-                const containerDeducciones = document.getElementById('otras-deducciones-container');
-                if (containerDevengos) containerDevengos.innerHTML = '';
-                if (containerDeducciones) containerDeducciones.innerHTML = '';
+                if (nominaResultadoContainer) nominaResultadoContainer.classList.add('hidden');
 
-                // 5. Resetear selects
-                const selDevengo = document.getElementById('select-devengo');
-                const selDeduccion = document.getElementById('select-deduccion');
-                if (selDevengo) selDevengo.selectedIndex = 0;
-                if (selDeduccion) selDeduccion.selectedIndex = 0;
-
-                // 6. Ocultar resultados previos
-                const resultContainer = document.getElementById('nomina-resultado-container');
-                const resultDiv = document.getElementById('nomina-resultado');
-                if (resultContainer) resultContainer.classList.add('hidden');
-                if (resultDiv) resultDiv.innerHTML = '';
-
-                // --- CORRECCIÓN DEL ERROR btnAplicarIrpf ---
+                // --- CORRECCIÓN ERROR btnAplicarIrpf ---
                 const irpfSugeridoLabel = document.getElementById('irpf-sugerido-label');
-                const btnAplicarIrpf = document.getElementById('btn-aplicar-irpf'); // Capturamos el botón
+                const btnAplicarIrpf = document.getElementById('btn-aplicar-irpf');
+                
+                // Reset visual inicial
+                if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "";
+                if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
 
-                // Cálculo de recomendación IRPF
                 const empId = nominaEmpleadoSelect.value;
                 if (empId) {
                     const emp = empleados.find(e => e.id === empId);
-                    const puesto = puestos.find(p => p.id === emp.puestoId);
+                    const puesto = puestos.find(p => p.id === emp?.puestoId);
                     
-                    // Solo intentamos calcular si tenemos elementos donde mostrarlo
-                    if (puesto && puesto.salario && typeof calcularIRPFRecomendado === 'function') {
+                    // Solo calculamos si tenemos la función disponible
+                    if (puesto && typeof calcularIRPFRecomendado === 'function') {
                         const resIrpf = calcularIRPFRecomendado(parseFloat(puesto.salario), 14, emp);
-
                         if (resIrpf) {
                             if (irpfSugeridoLabel) {
                                 irpfSugeridoLabel.innerHTML = `Sugerido: <strong>${resIrpf.tipo}%</strong>`;
-                                irpfSugeridoLabel.dataset.valor = resIrpf.tipo;
                             }
-                            // AQUÍ ESTABA EL ERROR: Verificamos que el botón exista antes de tocar su estilo
                             if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'inline-block';
-                        } else {
-                            if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "Sin tablas IRPF";
-                            if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
                         }
                     }
-                } else {
-                    if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "";
-                    if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
                 }
             });
 
@@ -3725,61 +3702,53 @@
                 });
             }
 
-            
             // 2. Guardado Lote
             if (btnGuardarLoteBd) {
                 btnGuardarLoteBd.addEventListener('click', async () => {
-                    // Verificamos que haya datos calculados
                     if (!ultimoCalculo || !Array.isArray(ultimoCalculo) || ultimoCalculo.length === 0) {
-                        console.warn("No hay datos calculados para guardar.");
+                        showModal({ title: "Error", message: "No hay nóminas calculadas para guardar." });
                         return;
                     }
 
                     const originalText = btnGuardarLoteBd.innerHTML;
                     btnGuardarLoteBd.disabled = true;
-                    btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Iniciando...`;
+                    btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Procesando...`;
 
                     let guardados = 0;
                     let errores = 0;
 
-                    // Iteramos sobre el array de resultados 'ultimoCalculo'
                     for (let i = 0; i < ultimoCalculo.length; i++) {
                         const item = ultimoCalculo[i];
 
-                        // Si la nómina tiene error de cálculo, la saltamos
-                        if (item.nomina.error) {
+                        // 1. VERIFICACIÓN DE SEGURIDAD "NaN"
+                        // Si el total devengado es "NaN" (string), el cálculo falló por fechas inválidas.
+                        if (item.nomina.totalDevengos === "NaN" || isNaN(parseFloat(item.nomina.totalDevengos))) {
+                            console.error(`Omitiendo ${item.empleado.nombre}: Cálculo inválido (NaN). Revisa fechas.`);
                             errores++;
                             continue;
                         }
 
-                        // --- CORRECCIÓN CRÍTICA PARA EL ERROR "NaN" ---
-                        // 1. Obtenemos la fecha de inicio del periodo de ESTE item
-                        const fechaString = item.periodo.inicio; 
-                        const fechaObj = new Date(fechaString);
-
-                        // 2. Calculamos mes y año asegurando que sean números
-                        // Si la fecha es inválida, fechaObj.getMonth() devolverá NaN
-                        const mesCalculado = !isNaN(fechaObj.getTime()) ? (fechaObj.getMonth() + 1) : null;
-                        const anioCalculado = !isNaN(fechaObj.getTime()) ? fechaObj.getFullYear() : null;
-
-                        // 3. Si por alguna razón falló el cálculo, saltamos este registro para no romper la BD
-                        if (!mesCalculado || !anioCalculado) {
-                            console.error(`Fecha inválida para el empleado ${item.empleado.nombre}: ${fechaString}`);
+                        // 2. CALCULAR MES Y AÑO SEGURO
+                        const fechaObj = new Date(item.periodo.inicio);
+                        // Validar que la fecha sea real
+                        if (isNaN(fechaObj.getTime())) {
                             errores++;
                             continue;
                         }
+                        
+                        const mesCalculado = fechaObj.getMonth() + 1;
+                        const anioCalculado = fechaObj.getFullYear();
 
-                        // Actualizamos UI
+                        // UI Feedback
                         btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando ${i + 1}/${ultimoCalculo.length}...`;
 
                         try {
-                            // Construimos el objeto a enviar
                             const payload = {
                                 empleado: item.empleado,
                                 periodo: item.periodo,
-                                nomina: item.nomina,
-                                mes: mesCalculado,   // Integer
-                                anio: anioCalculado  // Integer
+                                nomina: item.nomina, // Aquí van los importes
+                                mes: mesCalculado,   
+                                anio: anioCalculado
                             };
 
                             const response = await fetch('/api/guardar', {
@@ -3789,30 +3758,22 @@
                             });
                             
                             const result = await response.json();
-
-                            if (result.success) {
-                                guardados++;
-                            } else {
-                                errores++;
-                                console.error(`Error Backend (${item.empleado.nombre}):`, result.error);
-                            }
+                            if (result.success) guardados++;
+                            else errores++;
 
                         } catch (error) {
+                            console.error(error);
                             errores++;
-                            console.error(`Error Red/Fetch (${item.empleado.nombre}):`, error);
                         }
                     }
 
-                    // Restaurar botón
                     btnGuardarLoteBd.innerHTML = originalText;
                     btnGuardarLoteBd.disabled = false;
-                    
-                    // Re-inicializar iconos por si acaso
                     if (typeof lucide !== 'undefined') lucide.createIcons();
 
                     showModal({
                         title: "Proceso Finalizado",
-                        message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores: ${errores}`
+                        message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores/Omitidos: ${errores}\n\nNota: Si hubo errores, revisa que las fechas de inicio/fin sean válidas.`
                     });
                 });
             }
