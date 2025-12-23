@@ -1,0 +1,166 @@
+{
+  "puestos": [
+    {
+      "id": "p_1760119508066",
+      "nombre": "Educador infantil",
+      "salario": "1245",
+      "horas": "38",
+      "cpp": "26.37"
+    },
+    {
+      "id": "p_1760212736265",
+      "nombre": "Dirección",
+      "salario": "1615",
+      "horas": "35",
+      "cpp": "26.37"
+    },
+    {
+      "id": "p_1760212761876",
+      "nombre": "Auxiliar",
+      "salario": "1184",
+      "horas": "39",
+      "cpp": "19.04"
+    },
+    {
+      "id": "p_1760212786662",
+      "nombre": "Personal Limpieza",
+      "salario": "1184",
+      "horas": "38",
+      "cpp": "19.04"
+    },
+    {
+      "id": "p_1760212808047",
+      "nombre": "Prácticas",
+      "salario": "42.85",
+      "horas": "30",
+      "cpp": "0"
+    }
+  ],
+  "empleados": [
+    {
+      "id": "e_1760209235200",
+      "nombre": "Maria del Pilar Muñoz Peña",
+      "puestoId": "p_1760119508066",
+      "horas": "38",
+      "tipoContrato": "Indefinido",
+      "dni": "75786204P",
+      "ss": "111020535705",
+      "antiguedad": "2005-09-01",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760212880550",
+      "nombre": "Cristina Macías García",
+      "puestoId": "p_1760212736265",
+      "horas": "35",
+      "tipoContrato": "Indefinido",
+      "dni": "44963196J",
+      "ss": "111013167442",
+      "antiguedad": "2004-04-01",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215685403",
+      "nombre": "Josefa María Saenz Ordoñez",
+      "puestoId": "p_1760119508066",
+      "horas": "35",
+      "tipoContrato": "Indefinido",
+      "dni": "31338916J",
+      "ss": "110077515184",
+      "antiguedad": "2003-08-01",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215784267",
+      "nombre": "Maria Teresa Garrido García",
+      "puestoId": "p_1760212786662",
+      "horas": "6",
+      "tipoContrato": "Indefinido",
+      "dni": "31333165N",
+      "ss": "110063825454",
+      "antiguedad": "2005-11-02",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215824764",
+      "nombre": "Beatriz Marroquín Chaves",
+      "puestoId": "p_1760119508066",
+      "horas": "35",
+      "tipoContrato": "Indefinido",
+      "dni": "75786543W",
+      "ss": "111042830850",
+      "antiguedad": "2004-04-01",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215866105",
+      "nombre": "Inmaculada Arias Samper",
+      "puestoId": "p_1760119508066",
+      "horas": "15",
+      "tipoContrato": "Indefinido",
+      "dni": "44964298B",
+      "ss": "111046923543",
+      "antiguedad": "2023-12-19",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215900919",
+      "nombre": "Alfonso Ruiz Collantes",
+      "puestoId": "p_1760119508066",
+      "horas": "30",
+      "tipoContrato": "Indefinido",
+      "dni": "75794831X",
+      "ss": "111052212265",
+      "antiguedad": "2020-09-01",
+      "cotizacion": "09"
+    },
+    {
+      "id": "e_1760215940169",
+      "nombre": "Maria Peña Velazquez",
+      "puestoId": "p_1760119508066",
+      "horas": "25",
+      "tipoContrato": "Fijo-discontinuo",
+      "dni": "44967724X",
+      "ss": "111064169234",
+      "antiguedad": "2022-09-05",
+      "cotizacion": "09"
+    }
+  ],
+  "configSS": {
+    "ss-cc-empleado": "4.7",
+    "ss-desempleo-empleado": "1.55",
+    "ss-fp-empleado": "0.1",
+    "ss-mei-empleado": "0.13",
+    "ss-cc-empresa": "23.6",
+    "ss-at-ep-empresa": "1.5",
+    "ss-desempleo-ind-gen-empresa": "5.5",
+    "ss-desempleo-ind-dis-empresa": "4.7",
+    "ss-desempleo-tem-gen-empresa": "7.05",
+    "ss-desempleo-tem-dis-empresa": "6.25",
+    "ss-fp-empresa": "0.65",
+    "ss-fogasa-empresa": "0.2"
+  },
+  "conceptos": {
+    "devengos": [
+      "Complemento",
+      "Horas Extras",
+      "COMP. VOL"
+    ],
+    "deducciones": [
+      "Anticipo"
+    ]
+  },
+  "empresa": {
+    "nombre": "GARCIA VAZQUEZ RAFAELA",
+    "domicilio": "ALVAR NUÑEZ, EDIFICIO OASIS 00",
+    "cif": "27905670T",
+    "ccc": "11104320530"
+  },
+  "tiposContrato": [
+    "Indefinido",
+    "Temporal",
+    "Fijo-discontinuo",
+    "Formación y Aprendizaje",
+    "Prácticas"
+  ]
+}

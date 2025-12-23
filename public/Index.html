@@ -1,0 +1,2888 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación de Gestión de Nóminas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        // Comprobación de sesión al cargar la página principal
+        if (sessionStorage.getItem('isLoggedIn') !== 'true') {
+            // Si no hay señal de sesión, redirige a login.html
+            window.location.replace('login.html');
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #d1d5db;
+        }
+
+        .sidebar-icon {
+            stroke-width: 1.5;
+        }
+
+        .form-input {
+            background-color: #374151;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            border-radius: 0.5rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px #1e40af;
+        }
+
+        .btn {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .btn-danger {
+            background-color: #dc2626;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #b91c1c;
+        }
+
+        .btn-secondary {
+            background-color: #4b5563;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #6b7280;
+        }
+
+        .content-card {
+            background-color: #1f2937;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            border: 1px solid #374151;
+        }
+
+        /* Ocultar secciones por defecto */
+        .page-content {
+            display: none;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        /* */
+        .admin-tab-content {
+            display: none;
+        }
+
+        .admin-tab-content.active {
+            display: block;
+        }
+
+        .tab-button.active {
+            background-color: #2563eb;
+            color: white;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+        }
+
+        .data-table thead {
+            border-bottom: 1px solid #4b5563;
+        }
+
+        .data-table tbody tr:not(:last-child) {
+            border-bottom: 1px solid #374151;
+        }
+
+        .nomina-result-grid {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.5rem 1.5rem;
+        }
+
+        .nomina-result-grid dt {
+            font-weight: 500;
+            color: #9ca3af;
+        }
+
+        .nomina-result-grid dd {
+            text-align: right;
+            font-weight: 600;
+            color: #e5e7eb;
+        }
+
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #111827;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out;
+        }
+
+        #app-container.hidden {
+            display: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="sello.js"></script>
+    <script src="pdfGenerator.js" defer></script>
+</head>
+
+<body class="flex h-screen">
+    <div id="loading-screen">
+        <img src="Logo2.png" alt="Cargando..." class="h-24 animate-pulse">
+    </div>
+    <div id="app-container" class="hidden h-screen flex"></div>
+    <aside class="w-64 bg-gray-900 p-6 flex flex-col justify-between">
+        <div>
+            <div class="mb-10 flex justify-center">
+                <img src="Logo2.png" alt="Logo de la Empresa" class="h-13">
+            </div>
+            <nav class="flex flex-col space-y-2">
+                <a href="#puestos"
+                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
+                    data-target="puestos">
+                    <i data-lucide="briefcase" class="sidebar-icon"></i>
+                    <span>Puestos de Trabajo</span>
+                </a>
+                <a href="#empleados"
+                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
+                    data-target="empleados">
+                    <i data-lucide="users" class="sidebar-icon"></i>
+                    <span>Empleados</span>
+                </a>
+                -->
+                <a href="#admin"
+                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
+                    data-target="admin">
+                    <i data-lucide="sliders-horizontal" class="sidebar-icon"></i>
+                    <span>Admin</span>
+                </a>
+                <a href="#nominas"
+                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
+                    data-target="nominas">
+                    <i data-lucide="file-text" class="sidebar-icon"></i>
+                    <span>Generar Nóminas</span>
+                </a>
+                <a href="#nominas-lote"
+                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
+                    data-target="nominas-lote">
+                    <i data-lucide="layers" class="sidebar-icon"></i>
+                    <span>Nóminas por Lote</span>
+                </a>
+            </nav>
+            <div class="mt-auto pt-4 border-t border-gray-700"> <button id="logout-button"
+                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-red-700 text-gray-300 transition-colors duration-200 w-full text-left">
+                    <i data-lucide="log-out" class="sidebar-icon"></i>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </div>
+        </div>
+        <div>
+            <div class="py-4 border-t border-gray-700 space-y-2">
+                <button id="exportar-datos"
+                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200 w-full text-left">
+                    <i data-lucide="download" class="sidebar-icon"></i>
+                    <span>Exportar Datos</span>
+                </button>
+                <button id="importar-datos"
+                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200 w-full text-left">
+                    <i data-lucide="upload" class="sidebar-icon"></i>
+                    <span>Importar Datos</span>
+                </button>
+            </div>
+            <div class="text-xs text-gray-500 pt-4 border-t border-gray-700">
+                <p>&copy; 2025 App de Nóminas</p>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-8 overflow-y-auto">
+        <div id="puestos" class="page-content">
+            <h2 class="text-3xl font-bold text-white mb-6">Gestión de Puestos de Trabajo</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-1 content-card">
+                    <h3 id="form-puesto-titulo" class="text-xl font-semibold text-white mb-4">Crear Nuevo Puesto</h3>
+                    <form id="form-puesto" class="space-y-4">
+                        <input type="hidden" id="puesto-id">
+                        <div>
+                            <label for="puesto-nombre" class="block mb-1 text-sm font-medium">Nombre del Puesto</label>
+                            <input type="text" id="puesto-nombre" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="puesto-salario" class="block mb-1 text-sm font-medium">Salario Base Mensual
+                                (€)</label>
+                            <input type="number" step="0.01" id="puesto-salario" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="puesto-horas" class="block mb-1 text-sm font-medium">Horas Estándar
+                                Semana</label>
+                            <input type="number" step="0.1" id="puesto-horas" class="w-full form-input p-2" required>
+                        </div>
+
+                        <fieldset class="border border-gray-600 p-4 rounded-lg">
+                            <legend class="text-sm font-medium px-2">Conceptos Salariales por Antigüedad</legend>
+                            <div id="conceptos-adicionales-container" class="space-y-2 mb-4">
+                            </div>
+                            <div class="space-y-3 bg-gray-800 p-3 rounded-md">
+                                <h4 class="text-sm font-medium text-gray-300">Añadir Nuevo Concepto</h4>
+                                <input type="text" id="new-concepto-nombre"
+                                    placeholder="Nombre (Ej: Antigüedad, Quinquenio)"
+                                    class="w-full form-input p-2 text-sm">
+                                <div class="flex space-x-2">
+                                    <input type="number" step="0.01" id="new-concepto-importe" placeholder="Importe (€)"
+                                        class="w-1/2 form-input p-2 text-sm">
+                                    <input type="number" step="1" id="new-concepto-periodicidad"
+                                        placeholder="Cada X años" class="w-1/2 form-input p-2 text-sm">
+                                </div>
+                                <button type="button" id="btn-add-concepto-puesto"
+                                    class="w-full btn btn-secondary btn-sm py-1.5">Añadir Concepto al Puesto</button>
+                            </div>
+                        </fieldset>
+
+                        <div class="flex space-x-2 pt-2">
+                            <button type="submit" class="btn btn-primary w-full">Guardar Puesto</button>
+                            <button type="button" id="cancelar-edicion-puesto"
+                                class="btn btn-secondary w-full hidden">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="md:col-span-2 content-card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Puestos Existentes</h3>
+                    <div class="overflow-x-auto">
+                        <table id="lista-puestos" class="w-full data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Salario</th>
+                                    <th>Horas/Semana</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="empleados" class="page-content">
+            <h2 class="text-3xl font-bold text-white mb-6">Gestión de Empleados</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-1 content-card">
+                    <h3 id="form-empleado-titulo" class="text-xl font-semibold text-white mb-4">Añadir Nuevo Empleado
+                    </h3>
+                    <form id="form-empleado" class="space-y-4">
+                        <input type="hidden" id="empleado-id">
+                        <div>
+                            <label for="empleado-nombre" class="block mb-1 text-sm font-medium">Nombre</label>
+                            <input type="text" id="empleado-nombre" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empleado-puesto" class="block mb-1 text-sm font-medium">Puesto</label>
+                            <select id="empleado-puesto" class="w-full form-input p-2" required>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="empleado-horas" class="block mb-1 text-sm font-medium">Horas Contrato
+                                Semanales</label>
+                            <input type="number" id="empleado-horas" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empleado-tipo-contrato" class="block mb-1 text-sm font-medium">Tipo de
+                                Contrato</label>
+                            <select id="empleado-tipo-contrato" class="w-full form-input p-2" required>
+                                <option value="">-- Selecciona un tipo --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="empleado-dni" class="block mb-1 text-sm font-medium">DNI</label>
+                            <input type="text" id="empleado-dni" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empleado-ss" class="block mb-1 text-sm font-medium">Número SS</label>
+                            <input type="text" id="empleado-ss" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empleado-antiguedad" class="block mb-1 text-sm font-medium">Fecha
+                                Antigüedad</label>
+                            <input type="date" id="empleado-antiguedad" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empleado-cotizacion" class="block mb-1 text-sm font-medium">Grupo de
+                                Cotización</label>
+                            <input type="text" id="empleado-cotizacion" class="w-full form-input p-2" required>
+                        </div>
+                        <div class="flex space-x-2 pt-2">
+                            <button type="submit" class="btn btn-primary w-full">Guardar Empleado</button>
+                            <button type="button" id="cancelar-edicion-empleado"
+                                class="btn btn-secondary w-full hidden">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="md:col-span-2 content-card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Lista de Empleados</h3>
+                    <div class="overflow-x-auto">
+                        <table id="lista-empleados" class="w-full data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Puesto</th>
+                                    <th>Tipo de Contrato</th>
+                                    <th>DNI</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div id="admin" class="page-content">
+            <h2 class="text-3xl font-bold text-white mb-6">Administración</h2>
+
+            <div class="mb-6 border-b border-gray-700">
+                <nav class="flex space-x-4" aria-label="Tabs">
+                    <button
+                        class="tab-button active py-2 px-4 text-sm font-medium text-gray-300 rounded-t-lg hover:bg-gray-700"
+                        data-target="admin-ss">
+                        Configuración SS
+                    </button>
+                    <button
+                        class="tab-button py-2 px-4 text-sm font-medium text-gray-300 rounded-t-lg hover:bg-gray-700"
+                        data-target="admin-conceptos">
+                        Conceptos de Nómina
+                    </button>
+                    <button
+                        class="tab-button py-2 px-4 text-sm font-medium text-gray-300 rounded-t-lg hover:bg-gray-700"
+                        data-target="admin-empresa">
+                        Datos de Empresa
+                    </button>
+                    <button
+                        class="tab-button py-2 px-4 text-sm font-medium text-gray-300 rounded-t-lg hover:bg-gray-700"
+                        data-target="admin-contratos">
+                        Tipos de Contrato
+                    </button>
+                    <button id="tab-admin-usuarios"
+                        class="tab-button py-2 px-4 text-sm font-medium text-gray-300 rounded-t-lg hover:bg-gray-700 hidden"
+                        data-target="admin-usuarios">
+                        Gestionar Usuarios
+                    </button>
+                </nav>
+            </div>
+
+            <div id="admin-ss" class="admin-tab-content active">
+                <form id="form-admin" class="content-card max-w-4xl mx-auto">
+                    <h3 class="text-2xl font-bold text-white mb-6">Configuración de Cotizaciones de la Seguridad Social
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                        <div class="space-y-4">
+                            <h3 class="text-xl font-semibold text-white">Cotizaciones del Empleado</h3>
+                            <div>
+                                <label for="ss-cc-empleado" class="block mb-1 text-sm font-medium">Contingencias Comunes
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-cc-empleado" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                            <div>
+                                <label for="ss-desempleo-empleado" class="block mb-1 text-sm font-medium">Desempleo
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-desempleo-empleado"
+                                    class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="ss-fp-empleado" class="block mb-1 text-sm font-medium">Formación Profesional
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-fp-empleado" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                            <div>
+                                <label for="ss-mei-empleado" class="block mb-1 text-sm font-medium">Mecanismo Equidad
+                                    Intergeneracional (%)</label>
+                                <input type="number" step="0.0001" id="ss-mei-empleado" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h3 class="text-xl font-semibold text-white">Cotizaciones de la Empresa</h3>
+                            <div>
+                                <label for="ss-cc-empresa" class="block mb-1 text-sm font-medium">Contingencias Comunes
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-cc-empresa" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                            <div>
+                                <label for="ss-at-ep-empresa" class="block mb-1 text-sm font-medium">Accidentes de
+                                    Trabajo y EP (%)</label>
+                                <input type="number" step="0.0001" id="ss-at-ep-empresa" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                            <div>
+                                <label for="ss-desempleo-ind-gen-empresa"
+                                    class="block mb-1 text-sm font-medium">Desempleo (Indefinido General) (%)</label>
+                                <input type="number" step="0.0001" id="ss-desempleo-ind-gen-empresa"
+                                    class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="ss-desempleo-ind-dis-empresa"
+                                    class="block mb-1 text-sm font-medium">Desempleo (Indefinido Discapacidad)
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-desempleo-ind-dis-empresa"
+                                    class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="ss-desempleo-tem-gen-empresa"
+                                    class="block mb-1 text-sm font-medium">Desempleo (Temporal General) (%)</label>
+                                <input type="number" step="0.0001" id="ss-desempleo-tem-gen-empresa"
+                                    class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="ss-desempleo-tem-dis-empresa"
+                                    class="block mb-1 text-sm font-medium">Desempleo (Temporal Discapacidad) (%)</label>
+                                <input type="number" step="0.0001" id="ss-desempleo-tem-dis-empresa"
+                                    class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="ss-fp-empresa" class="block mb-1 text-sm font-medium">Formación Profesional
+                                    (%)</label>
+                                <input type="number" step="0.0001" id="ss-fp-empresa" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                            <div>
+                                <label for="ss-fogasa-empresa" class="block mb-1 text-sm font-medium">FOGASA (%)</label>
+                                <input type="number" step="0.0001" id="ss-fogasa-empresa" class="w-full form-input p-2"
+                                    required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-8 flex justify-end">
+                        <button type="submit" class="btn btn-primary">Guardar Configuración SS</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="admin-conceptos" class="admin-tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="content-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Conceptos de Devengo</h3>
+                        <form id="form-add-devengo" class="flex space-x-2 mb-4">
+                            <input type="text" id="new-devengo-name" placeholder="Nombre del nuevo devengo"
+                                class="w-full form-input p-2" required>
+                            <button type="submit" class="btn btn-primary whitespace-nowrap">Añadir</button>
+                        </form>
+                        <ul id="lista-devengos" class="space-y-2">
+                        </ul>
+                    </div>
+                    <div class="content-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Conceptos de Deducción</h3>
+                        <form id="form-add-deduccion" class="flex space-x-2 mb-4">
+                            <input type="text" id="new-deduccion-name" placeholder="Nombre de la nueva deducción"
+                                class="w-full form-input p-2" required>
+                            <button type="submit" class="btn btn-primary whitespace-nowrap">Añadir</button>
+                        </form>
+                        <ul id="lista-deducciones" class="space-y-2">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div id="admin-empresa" class="admin-tab-content">
+                <form id="form-empresa" class="content-card max-w-2xl mx-auto">
+                    <h3 class="text-2xl font-bold text-white mb-6">Datos de la Empresa</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="empresa-nombre" class="block mb-1 text-sm font-medium">Nombre de la
+                                Empresa</label>
+                            <input type="text" id="empresa-nombre" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empresa-domicilio" class="block mb-1 text-sm font-medium">Domicilio</label>
+                            <input type="text" id="empresa-domicilio" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empresa-cif" class="block mb-1 text-sm font-medium">CIF</label>
+                            <input type="text" id="empresa-cif" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="empresa-ccc" class="block mb-1 text-sm font-medium">Código de Cuenta de
+                                Cotización (CCC)</label>
+                            <input type="text" id="empresa-ccc" class="w-full form-input p-2" required>
+                        </div>
+                    </div>
+                    <div class="mt-8 flex justify-end">
+                        <button type="submit" class="btn btn-primary">Guardar Datos</button>
+                    </div>
+                </form>
+            </div>
+            <div id="admin-contratos" class="admin-tab-content">
+                <div class="content-card max-w-2xl mx-auto">
+                    <h3 class="text-2xl font-bold text-white mb-6">Gestionar Tipos de Contrato</h3>
+                    <form id="form-add-contrato" class="flex space-x-2 mb-4">
+                        <input type="text" id="new-contrato-name" placeholder="Nombre del nuevo tipo de contrato"
+                            class="w-full form-input p-2" required>
+                        <button type="submit" class="btn btn-primary whitespace-nowrap">Añadir</button>
+                    </form>
+                    <ul id="lista-contratos" class="space-y-2">
+                    </ul>
+                </div>
+            </div>
+            <div id="admin-usuarios" class="admin-tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="content-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Añadir Nuevo Usuario</h3>
+                        <form id="form-add-usuario" class="space-y-4">
+                            <div>
+                                <label for="new-username" class="block mb-1 text-sm font-medium">Nombre de
+                                    Usuario</label>
+                                <input type="text" id="new-username" class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="new-password" class="block mb-1 text-sm font-medium">Contraseña</label>
+                                <input type="password" id="new-password" class="w-full form-input p-2" required>
+                            </div>
+                            <div class="pt-2">
+                                <button type="submit" class="btn btn-primary w-full">Añadir Usuario</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="content-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Usuarios Existentes</h3>
+                        <ul id="lista-usuarios" class="space-y-2">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="nominas" class="page-content">
+            <h2 class="text-3xl font-bold text-white mb-6">Generar Nómina</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-1 content-card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Parámetros de Cálculo</h3>
+                    <form id="form-nomina" class="space-y-4">
+                        <div>
+                            <label for="nomina-empleado" class="block mb-1 text-sm font-medium">Empleado</label>
+                            <select id="nomina-empleado" class="w-full form-input p-2" required></select>
+                        </div>
+
+                        <!-- TOGGLE MODO MANUAL -->
+                        <div class="bg-gray-700 p-3 rounded flex items-center">
+                            <input type="checkbox" id="manual-mode-toggle"
+                                class="mr-3 h-5 w-5 rounded bg-gray-600 border-gray-500 text-blue-600 focus:ring-blue-500">
+                            <label for="manual-mode-toggle" class="text-sm text-gray-200 select-none font-bold">Activar
+                                Modo
+                                Manual</label>
+                        </div>
+
+                        <!-- CAMPOS MANUALES -->
+                        <div id="manual-mode-fields"
+                            class="space-y-4 border border-blue-500 p-4 rounded-lg hidden bg-gray-800">
+                            <h4 class="text-blue-400 font-semibold mb-2">Datos Manuales</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Salario Base</label>
+                                    <input type="number" step="0.01" id="manual-salario-base"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Prorrata Extra</label>
+                                    <input type="number" step="0.01" id="manual-prorrata"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Plus Convenio / CPP</label>
+                                    <input type="number" step="0.01" id="manual-plus-convenio"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Base Cotización Total</label>
+                                    <input type="number" step="0.01" id="manual-base-cotizacion"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Prestación Baja</label>
+                                    <input type="number" step="0.01" id="manual-prestacion-baja"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">Complemento Baja</label>
+                                    <input type="number" step="0.01" id="manual-complemento-baja"
+                                        class="w-full form-input p-2 text-sm" placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="nomina-fecha-inicio" class="block mb-1 text-sm font-medium">Fecha de
+                                Inicio</label>
+                            <input type="date" id="nomina-fecha-inicio" class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="nomina-fecha-fin" class="block mb-1 text-sm font-medium">Fecha de Fin</label>
+                            <input type="date" id="nomina-fecha-fin" class="w-full form-input p-2" required>
+                        </div>
+                        <fieldset id="fieldset-baja" class="border border-gray-600 p-4 rounded-lg">
+                            <legend class="text-sm font-medium px-2">Periodo de Baja (Opcional)</legend>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="nomina-baja-inicio" class="block mb-1 text-sm font-medium">Inicio de la
+                                        Baja</label>
+                                    <input type="date" id="nomina-baja-inicio" class="w-full form-input p-2">
+                                </div>
+                                <div>
+                                    <label for="nomina-baja-fin" class="block mb-1 text-sm font-medium">Fin de la
+                                        Baja</label>
+                                    <input type="date" id="nomina-baja-fin" class="w-full form-input p-2">
+                                </div>
+                                <div>
+                                    <label for="nomina-base-mes-anterior" class="block mb-1 text-sm font-medium">Base
+                                        Cotización Mes Anterior a la Baja (€)</label>
+                                    <input type="number" step="0.01" id="nomina-base-mes-anterior"
+                                        class="w-full form-input p-2" placeholder="Ej: 2000.00">
+                                    <p class="text-xs text-gray-400 mt-1">Requerido si hay baja para el cálculo correcto
+                                        de la cotización.</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border border-gray-600 p-4 rounded-lg">
+                            <legend class="text-sm font-medium px-2">Ajustes Manuales</legend>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="nomina-irpf" class="block mb-1 text-sm font-medium">IRPF (%)</label>
+                                    <input type="number" step="0.01" id="nomina-irpf" class="w-full form-input p-2"
+                                        value="0.00" required>
+                                </div>
+                                -->
+                                <div>
+                                    <label class="block mb-2 text-sm font-medium">Otros Devengos</label>
+                                    <div class="flex space-x-2 items-center">
+                                        <select id="select-devengo" class="w-full form-input p-2 text-sm">
+                                        </select>
+                                        <button type="button" id="add-devengo-btn" class="p-2 btn-secondary rounded-md">
+                                            <i data-lucide="plus" class="w-5 h-5"></i>
+                                        </button>
+                                    </div>
+                                    <div id="otros-devengos-container" class="space-y-2 mt-2">
+                                    </div>
+                                </div>
+                                -->
+                                <div>
+                                    <label class="block mb-2 mt-4 text-sm font-medium">Otras Deducciones</label>
+                                    <div class="flex space-x-2 items-center">
+                                        <select id="select-deduccion" class="w-full form-input p-2 text-sm">
+                                        </select>
+                                        <button type="button" id="add-deduccion-btn"
+                                            class="p-2 btn-secondary rounded-md">
+                                            <i data-lucide="plus" class="w-5 h-5"></i>
+                                        </button>
+                                    </div>
+                                    <div id="otras-deducciones-container" class="space-y-2 mt-2">
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="pt-2">
+                            <button type="submit" class="btn btn-primary w-full">Calcular Nómina</button>
+                        </div>
+                    </form>
+                </div>
+                <div id="nomina-resultado-container" class="md:col-span-2 content-card hidden">
+                    <h3 class="text-xl font-semibold text-white mb-4">Resultado de la Nómina</h3>
+
+                    <div id="nomina-resultado"></div>
+
+                    <div class="mt-6 flex justify-end space-x-4">
+                        <button id="btn-exportar-nomina" class="btn btn-secondary" style="display: none;">
+                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                            Exportar a Excel (.csv)
+                        </button>
+                        <button id="btn-exportar-pdf" class="btn btn-secondary" style="display: none;">
+                            <i data-lucide="file-type" class="w-4 h-4 mr-2"></i>
+                            Exportar a PDF
+                        </button>
+                    </div>
+                    <div class="mt-6 flex justify-end space-x-4">
+                        <button id="btn-guardar-neon" class="btn btn-primary" style="display: none;">
+                            <span>Guardar en Nube</span>
+                        </button>
+                        
+                        <button id="btn-exportar-nomina" ...>...</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="nominas-lote" class="page-content">
+            <h2 class="text-3xl font-bold text-white mb-6">Generar Nóminas por Lote</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="md:col-span-1 content-card">
+                    <h3 class="text-xl font-semibold text-white mb-4">Parámetros Comunes</h3>
+                    <form id="form-nomina-lote" class="space-y-4">
+                        <div>
+                            <label class="block mb-2 text-sm font-medium">Empleado(s) a Procesar</label>
+                            <div class="border border-gray-600 rounded-lg p-3 h-48 overflow-y-auto">
+                                <div class="flex items-center border-b border-gray-600 pb-2 mb-2">
+                                    <input type="checkbox" id="seleccionar-todos-empleados-lote"
+                                        class="mr-2 h-4 w-4 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500">
+                                    <label for="seleccionar-todos-empleados-lote"
+                                        class="text-sm font-medium">Seleccionar Todos</label>
+                                </div>
+                                <div id="nomina-lista-empleados-lote" class="space-y-2"> </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="nomina-fecha-inicio-lote" class="block mb-1 text-sm font-medium">Fecha de
+                                Inicio</label> <input type="date" id="nomina-fecha-inicio-lote"
+                                class="w-full form-input p-2" required>
+                        </div>
+                        <div>
+                            <label for="nomina-fecha-fin-lote" class="block mb-1 text-sm font-medium">Fecha de
+                                Fin</label> <input type="date" id="nomina-fecha-fin-lote" class="w-full form-input p-2"
+                                required>
+                        </div>
+
+                        <fieldset class="border border-gray-600 p-4 rounded-lg">
+                            <legend class="text-sm font-medium px-2">Ajustes Generales</legend>
+                            <div>
+                                <label for="nomina-irpf-lote" class="block mb-1 text-sm font-medium">IRPF General
+                                    (%)</label> <input type="number" step="0.01" id="nomina-irpf-lote"
+                                    class="w-full form-input p-2" value="0.00" required>
+                                <p class="text-xs text-gray-400 mt-1">Se aplicará a todos los empleados seleccionados.
+                                </p>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border border-gray-600 p-4 rounded-lg">
+                            <legend class="text-sm font-medium px-2">Ajustes Comunes (Opcional)</legend>
+                            <p class="text-xs text-gray-400 mb-3">Los conceptos añadidos aquí se aplicarán a **todos**
+                                los empleados seleccionados.</p>
+                            <div>
+                                <label class="block mb-2 text-sm font-medium">Otros Devengos Comunes</label>
+                                <div class="flex space-x-2 items-center">
+                                    <select id="select-devengo-lote" class="w-full form-input p-2 text-sm">...</select>
+                                    <button type="button" id="add-devengo-lote-btn"
+                                        class="p-2 btn-secondary rounded-md">...</button>
+                                </div>
+                                <div id="otros-devengos-lote-container" class="space-y-2 mt-2">...</div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="block mb-2 text-sm font-medium">Otras Deducciones Comunes</label>
+                                <div class="flex space-x-2 items-center">
+                                    <select id="select-deduccion-lote"
+                                        class="w-full form-input p-2 text-sm">...</select>
+                                    <button type="button" id="add-deduccion-lote-btn"
+                                        class="p-2 btn-secondary rounded-md">...</button>
+                                </div>
+                                <div id="otras-deducciones-lote-container" class="space-y-2 mt-2">...</div>
+                            </div>
+                        </fieldset>
+
+                        <div class="pt-2">
+                            <button type="submit" class="btn btn-primary w-full">Calcular Nóminas Lote</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="nomina-lote-resultado-container" class="md:col-span-2 content-card hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-white">Resultado del Lote</h3>
+
+                            <div class="flex space-x-2">
+                                <button id="btn-exportar-lote-csv" class="btn btn-secondary" style="display: none;">
+                                    <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                    Exportar Lote (.csv)
+                                </button>
+
+                                <button id="btn-exportar-lote-pdf" class="btn btn-secondary" style="display: none;">
+                                    <i data-lucide="file-type" class="w-4 h-4 mr-2"></i>
+                                    Exportar Lote (PDF)
+                                </button>
+                            </div>
+
+                        </div>
+
+                    </div>
+                    <div id="nomina-lote-resultado"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+    </div>
+    <div id="custom-modal-overlay"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div id="custom-modal" class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 id="modal-title" class="text-xl font-bold text-white mb-4"></h3>
+            <p id="modal-message" class="text-gray-300 mb-6"></p>
+            <div id="modal-buttons" class="flex justify-end space-x-4">
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <!-- MODAL PARA VER DETALLE DE NÓMINA (LOTE) -->
+    <div id="nomina-detail-modal-overlay"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="nomina-detail-modal-title" class="text-xl font-bold text-white">Detalle de Nómina</h3>
+                <button id="close-nomina-detail-modal" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div id="nomina-detail-modal-content" class="p-6 overflow-y-auto flex-1 text-sm text-gray-300">
+                <!-- Content injected by JS -->
+            </div>
+            <div class="p-6 border-t border-gray-700 flex justify-end">
+                <button id="btn-close-detail-modal" class="btn btn-secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ESPECÍFICO PARA DETALLES DE LOTE -->
+    <div id="batch-employee-modal-overlay"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-700">
+                <h3 id="batch-modal-title" class="text-xl font-bold text-white">Detalles del Empleado</h3>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                <input type="hidden" id="batch-modal-emp-id">
+
+                <!-- Excluir Ajustes Comunes -->
+                <div class="bg-gray-700 p-3 rounded flex items-center mb-4">
+                    <input type="checkbox" id="batch-modal-exclude-common"
+                        class="mr-3 h-5 w-5 rounded bg-gray-600 border-gray-500 text-blue-600 focus:ring-blue-500">
+                    <label for="batch-modal-exclude-common" class="text-sm text-gray-200 select-none">Excluir Ajustes
+                        Comunes (Devengos y Deducciones Globales)</label>
+                </div>
+
+                <!-- Baja -->
+                <div class="bg-gray-900 p-4 rounded-lg space-y-3">
+                    <h4 class="text-sm font-semibold text-blue-400">Baja / Incapacidad Temporal</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Inicio Baja</label>
+                            <input type="date" id="batch-modal-baja-inicio" class="w-full form-input p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Fin Baja</label>
+                            <input type="date" id="batch-modal-baja-fin" class="w-full form-input p-2 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Base Mes Anterior (si hay baja)</label>
+                        <input type="number" step="0.01" id="batch-modal-base-anterior"
+                            class="w-full form-input p-2 text-sm" placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- IRPF -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">IRPF Específico (%)</label>
+                    <input type="number" step="0.01" id="batch-modal-irpf" class="w-full form-input p-2"
+                        placeholder="Dejar vacío para usar general">
+                </div>
+
+                <!-- Devengos Específicos -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Otros Devengos Específicos</label>
+                    <div class="flex space-x-2 mb-3">
+                        <select id="batch-modal-devengo-select" class="w-full form-input p-2 text-sm">
+                            <!-- Options populated by JS -->
+                        </select>
+                        <input type="number" id="batch-modal-devengo-amount" placeholder="Importe"
+                            class="w-24 form-input p-2 text-sm" step="0.01">
+                        <button type="button" id="batch-modal-add-devengo-btn" class="btn btn-secondary p-2">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div id="batch-modal-devengos-list" class="space-y-2"></div>
+                </div>
+
+                <!-- Deducciones Específicas -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Otras Deducciones Específicas</label>
+                    <div class="flex space-x-2 mb-3">
+                        <select id="batch-modal-deduccion-select" class="w-full form-input p-2 text-sm">
+                            <!-- Options populated by JS -->
+                        </select>
+                        <input type="number" id="batch-modal-deduccion-amount" placeholder="Importe"
+                            class="w-24 form-input p-2 text-sm" step="0.01">
+                        <button type="button" id="batch-modal-add-deduccion-btn" class="btn btn-secondary p-2">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div id="batch-modal-deducciones-list" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-700 flex justify-end space-x-3">
+                <button type="button" id="batch-modal-cancel-btn" class="btn btn-secondary">Cancelar</button>
+                <button type="button" id="batch-modal-save-btn" class="btn btn-primary">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="import-file-input" class="hidden" accept="application/json">
+
+    <script src="nominas.js"></script>
+    -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // ==========================================================
+            // --- LÓGICA DEL MODAL PERSONALIZADO ---
+            // ==========================================================
+            const modalOverlay = document.getElementById('custom-modal-overlay');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalButtons = document.getElementById('modal-buttons');
+
+            const logoutButton = document.getElementById('logout-button');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', () => {
+                    sessionStorage.removeItem('isLoggedIn'); // Borra la señal de sesión
+                    window.location.href = 'login.html'; // Redirige al login
+                });
+            }
+
+            const hideModal = () => {
+                modalOverlay.classList.add('hidden');
+            };
+
+            const showModal = ({ title, message, type = 'alert', onConfirm = () => { }, onCancel = () => { } }) => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalButtons.innerHTML = '';
+
+                if (type === 'confirm') {
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = 'Cancelar';
+                    cancelButton.className = 'btn btn-secondary';
+                    cancelButton.onclick = () => {
+                        hideModal();
+                        onCancel();
+                    };
+                    modalButtons.appendChild(cancelButton);
+                }
+
+                const confirmButton = document.createElement('button');
+                confirmButton.textContent = 'Aceptar';
+                confirmButton.className = 'btn btn-primary';
+                confirmButton.onclick = () => {
+                    hideModal();
+                    onConfirm();
+                };
+                modalButtons.appendChild(confirmButton);
+
+                modalOverlay.classList.remove('hidden');
+            };
+
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    hideModal();
+                }
+            });
+
+            // --- ICONOS LUCIDE ---
+            lucide.createIcons();
+
+            // --- LÓGICA COMÚN DE DATOS (LocalStorage) ---
+            const getFromStorage = (key) => JSON.parse(localStorage.getItem(key)) || [];
+            const saveToStorage = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+
+            let puestos = getFromStorage('puestos');
+            let empleados = getFromStorage('empleados');
+            let configSS = JSON.parse(localStorage.getItem('configSS')) || {};
+            let conceptos = JSON.parse(localStorage.getItem('conceptos')) || { devengos: [], deducciones: [] };
+            let empresa = JSON.parse(localStorage.getItem('empresa')) || {};
+            let tiposContrato = getFromStorage('tiposContrato');
+            let users = getFromStorage('appUsers');
+
+            // Variable para guardar el resultado de la última nómina calculada
+            let ultimaNominaCalculada = null;
+
+            // ==========================================================
+            // --- DEFINICIONES DE ELEMENTOS GLOBALES ---
+            // ==========================================================
+            const formPuesto = document.getElementById('form-puesto');
+            const listaPuestos = document.querySelector('#lista-puestos tbody');
+            const formPuestoTitulo = document.getElementById('form-puesto-titulo');
+            const puestoIdInput = document.getElementById('puesto-id');
+            const cancelarEdicionPuestoBtn = document.getElementById('cancelar-edicion-puesto');
+            const empleadoPuestoSelect = document.getElementById('empleado-puesto');
+            const formEmpleado = document.getElementById('form-empleado');
+            const listaEmpleados = document.querySelector('#lista-empleados tbody');
+            const formEmpleadoTitulo = document.getElementById('form-empleado-titulo');
+            const empleadoIdInput = document.getElementById('empleado-id');
+            const cancelarEdicionEmpleadoBtn = document.getElementById('cancelar-edicion-empleado');
+            const formNomina = document.getElementById('form-nomina');
+            const nominaEmpleadoSelect = document.getElementById('nomina-empleado');
+            const nominaResultadoContainer = document.getElementById('nomina-resultado-container');
+            const nominaResultadoDiv = document.getElementById('nomina-resultado');
+
+            // ==========================================================
+            // --- FUNCIONES DE AYUDA (Fechas, etc.) ---
+            // ==========================================================
+            const formatDateToYMD = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const setDefaultNominaDates = () => {
+                const today = new Date();
+                const firstDay = formatDateToYMD(new Date(today.getFullYear(), today.getMonth(), 1));
+                const lastDay = formatDateToYMD(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+                document.getElementById('nomina-fecha-inicio').value = firstDay;
+                document.getElementById('nomina-fecha-fin').value = lastDay;
+            };
+
+            // ==========================================================
+            // --- LÓGICA DE NAVEGACIÓN ---
+            // ==========================================================
+            const navLinks = document.querySelectorAll('.nav-link');
+            const pageContents = document.querySelectorAll('.page-content');
+
+            function showPage(targetId) {
+                pageContents.forEach(page => {
+                    page.classList.toggle('active', page.id === targetId);
+                });
+                navLinks.forEach(link => {
+                    link.classList.toggle('bg-gray-700', link.dataset.target === targetId);
+                });
+                localStorage.setItem('activePage', targetId);
+
+                // Ahora, encuentra y muestra SOLO la sección correcta
+                const targetPage = document.getElementById(targetId);
+                if (targetPage) {
+                    targetPage.classList.add('active');
+                }
+
+                // Activa SOLO el enlace del menú correspondiente
+                const targetLink = document.querySelector(`.nav-link[data-target="${targetId}"]`);
+                if (targetLink) {
+                    targetLink.classList.add('bg-gray-700');
+                }
+
+                // Guarda la última página visitada (excepto la de inicio)
+                if (targetId !== 'home-page') {
+                    localStorage.setItem('activePage', targetId);
+                } else {
+                    localStorage.removeItem('activePage');
+                }
+
+                /// --- LÓGICA ESPECÍFICA DE INICIALIZACIÓN POR PÁGINA ---
+                if (targetId === 'empleados') {
+                    renderTiposContratoDropdown();
+                } else if (targetId === 'admin') {
+                    const currentAdminTab = document.querySelector('#admin .tab-button.active')?.dataset.target || 'admin-ss';
+                    showAdminTab(currentAdminTab); // Muestra la última pestaña activa o la primera
+                    // Asegúrate de que los datos de las pestañas estén cargados
+                    renderConceptos();
+                    loadEmpresaData();
+                    renderTiposContrato();
+                    if (sessionStorage.getItem('loggedInUser') === 'admin') {
+                        renderUsuariosList();
+                    }
+                } else if (targetId === 'nominas') { // Individual
+                    renderEmpleadosDropdownNomina();
+                    setDefaultNominaDates(); // Asume que los IDs son nomina-fecha-inicio / fin
+                    renderConceptoDropdowns();
+                    // Opcional: Limpiar resultados de lote si estaban visibles
+                    nominaLoteResultadoContainer?.classList.add('hidden');
+                } else if (targetId === 'nominas-lote') { // Lote
+                    renderEmployeeSelectionListLote();
+                    setDefaultNominaDatesLote(); // Necesitamos esta función (ver abajo)
+                    renderConceptoDropdownsLote();
+                    // Opcional: Limpiar resultados individuales si estaban visibles
+                    nominaResultadoContainer?.classList.add('hidden');
+                }
+                // --- Control de visibilidad de la pestaña Usuarios (solo si estamos en Admin) ---
+                const tabUsuarios = document.getElementById('tab-admin-usuarios');
+                if (tabUsuarios) {
+                    const loggedInUser = sessionStorage.getItem('loggedInUser');
+                    if (targetId === 'admin' && loggedInUser === 'admin') {
+                        tabUsuarios.classList.remove('hidden');
+                    } else {
+                        tabUsuarios.classList.add('hidden');
+                        // Si intentan acceder a la pestaña sin ser admin, redirige
+                        if (document.querySelector('#admin .tab-button.active')?.dataset.target === 'admin-usuarios') {
+                            showAdminTab('admin-ss');
+                        }
+                    }
+                }
+            }
+
+            const setDefaultNominaDatesLote = () => {
+                const today = new Date();
+                const firstDay = formatDateToYMD(new Date(today.getFullYear(), today.getMonth(), 1));
+                const lastDay = formatDateToYMD(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+                // Asegúrate de que los IDs coincidan con tu HTML de lote
+                if (nominaFechaInicioLote) nominaFechaInicioLote.value = firstDay;
+                if (nominaFechaFinLote) nominaFechaFinLote.value = lastDay;
+            };
+
+            // ==========================================================
+            // --- LÓGICA DE PUESTOS DE TRABAJO ---
+            // ==========================================================
+            const renderPuestosDropdown = () => {
+                const currentPuestoId = empleadoPuestoSelect.value;
+                empleadoPuestoSelect.innerHTML = '<option value="">Selecciona un puesto...</option>';
+                puestos.forEach(puesto => {
+                    const option = document.createElement('option');
+                    option.value = puesto.id;
+                    option.textContent = puesto.nombre;
+                    empleadoPuestoSelect.appendChild(option);
+                });
+                empleadoPuestoSelect.value = currentPuestoId;
+            };
+
+            const renderPuestos = () => {
+                listaPuestos.innerHTML = '';
+                if (puestos.length === 0) {
+                    listaPuestos.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-4">No hay puestos registrados.</td></tr>';
+                    return;
+                }
+                puestos.forEach(puesto => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                <td>${puesto.nombre}</td>
+                <td>${parseFloat(puesto.salario).toFixed(2)} €</td>
+                <td>${parseFloat(puesto.horas).toFixed(1)}</td>
+                <td class="flex space-x-2">
+                    <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarPuesto('${puesto.id}')"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                    <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarPuesto('${puesto.id}')"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                </td>
+            `;
+                    listaPuestos.appendChild(tr);
+                });
+                lucide.createIcons();
+                renderPuestosDropdown();
+            };
+
+            const resetFormPuesto = () => {
+                formPuesto.reset();
+                puestoIdInput.value = '';
+                renderConceptosDelPuesto([]);
+                formPuestoTitulo.textContent = 'Crear Nuevo Puesto';
+                cancelarEdicionPuestoBtn.classList.add('hidden');
+            };
+
+            formPuesto.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const id = puestoIdInput.value;
+
+                const conceptosAdicionales = Array.from(conceptosContainer.children).map(div => {
+                    const [mainText] = div.querySelector('span').textContent.split(' - ');
+                    const [, importe, periodicidad] = div.querySelector('span').textContent.match(/(\d+\.?\d*)€ cada (\d+) año\(s\)/);
+                    return { nombre: mainText, importe, periodicidadAnios: periodicidad };
+                });
+                const puestoData = {
+                    id: id || `p_${Date.now()}`,
+                    nombre: document.getElementById('puesto-nombre').value,
+                    salario: document.getElementById('puesto-salario').value,
+                    horas: document.getElementById('puesto-horas').value,
+                    conceptosAdicionales: conceptosAdicionales,
+                };
+
+                if (id) {
+                    puestos = puestos.map(p => p.id === id ? puestoData : p);
+                } else {
+                    puestos.push(puestoData);
+                }
+
+                saveToStorage('puestos', puestos);
+                renderPuestos();
+                resetFormPuesto();
+            });
+
+            // --- LÓGICA PARA GESTIONAR CONCEPTOS DENTRO DE UN PUESTO ---
+            const conceptosContainer = document.getElementById('conceptos-adicionales-container');
+            const btnAddConceptoPuesto = document.getElementById('btn-add-concepto-puesto');
+
+            // Función para renderizar la lista de conceptos de un puesto en el formulario
+            const renderConceptosDelPuesto = (conceptos = []) => {
+                conceptosContainer.innerHTML = '';
+                conceptos.forEach((concepto, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center bg-gray-700 p-2 rounded text-sm';
+                    div.dataset.index = index;
+                    div.innerHTML = `
+                <span>${concepto.nombre} - ${concepto.importe}€ cada ${concepto.periodicidadAnios} año(s)</span>
+                <button type="button" class="p-1 text-red-400 hover:text-red-200 remove-concepto-puesto-btn">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>`;
+                    conceptosContainer.appendChild(div);
+                });
+                lucide.createIcons();
+            };
+
+            // Listener para el botón "Añadir Concepto al Puesto"
+            btnAddConceptoPuesto.addEventListener('click', () => {
+                const nombre = document.getElementById('new-concepto-nombre').value;
+                const importe = document.getElementById('new-concepto-importe').value;
+                const periodicidadAnios = document.getElementById('new-concepto-periodicidad').value;
+
+                if (!nombre || !importe || !periodicidadAnios) {
+                    showModal({ title: "Error", message: "Debes rellenar nombre, importe y periodicidad del concepto." });
+                    return;
+                }
+
+                const nuevoConcepto = { nombre, importe, periodicidadAnios };
+
+                // Obtenemos los conceptos actuales del formulario para no perderlos
+                const conceptosActuales = Array.from(conceptosContainer.children).map(div => {
+                    const [mainText] = div.querySelector('span').textContent.split(' - ');
+                    const [, importe, periodicidad] = div.querySelector('span').textContent.match(/(\d+\.?\d*)€ cada (\d+) año\(s\)/);
+                    return { nombre: mainText, importe, periodicidadAnios: periodicidad };
+                });
+
+                conceptosActuales.push(nuevoConcepto);
+                renderConceptosDelPuesto(conceptosActuales);
+
+                // Limpiamos los inputs
+                document.getElementById('new-concepto-nombre').value = '';
+                document.getElementById('new-concepto-importe').value = '';
+                document.getElementById('new-concepto-periodicidad').value = '';
+            });
+
+            // Listener para borrar un concepto de la lista del formulario
+            conceptosContainer.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-concepto-puesto-btn')) {
+                    e.target.closest('div').remove();
+                }
+            });
+
+            cancelarEdicionPuestoBtn.addEventListener('click', resetFormPuesto);
+
+            window.app = window.app || {};
+
+            app.editarPuesto = (id) => {
+                const puesto = puestos.find(p => p.id === id);
+                if (puesto) {
+                    puestoIdInput.value = puesto.id;
+                    document.getElementById('puesto-nombre').value = puesto.nombre;
+                    document.getElementById('puesto-salario').value = puesto.salario;
+                    document.getElementById('puesto-horas').value = puesto.horas;
+
+                    // Cargamos y renderizamos los conceptos del puesto
+                    renderConceptosDelPuesto(puesto.conceptosAdicionales || []);
+
+                    formPuestoTitulo.textContent = `Editar Puesto: ${puesto.nombre}`;
+                    cancelarEdicionPuestoBtn.classList.remove('hidden');
+                }
+            };
+
+            app.borrarPuesto = (id) => {
+                showModal({
+                    title: 'Confirmar Borrado',
+                    message: '¿Estás seguro de que quieres borrar este puesto?',
+                    type: 'confirm',
+                    onConfirm: () => {
+                        const empleadoEnPuesto = empleados.some(emp => emp.puestoId === id);
+                        if (empleadoEnPuesto) {
+                            showModal({ title: 'Operación denegada', message: 'No se puede borrar el puesto porque hay empleados asignados a él.' });
+                            return;
+                        }
+                        puestos = puestos.filter(p => p.id !== id);
+                        saveToStorage('puestos', puestos);
+                        renderPuestos();
+                        resetFormPuesto();
+                    }
+                });
+            };
+
+            // ==========================================================
+            // --- LÓGICA DE EMPLEADOS ---
+            // ==========================================================
+            const renderEmpleados = () => {
+                listaEmpleados.innerHTML = '';
+                if (empleados.length === 0) {
+                    listaEmpleados.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">No hay empleados registrados.</td></tr>';
+                    return;
+                }
+                empleados.forEach(empleado => {
+                    const puesto = puestos.find(p => p.id === empleado.puestoId) || { nombre: 'N/A' };
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                <td>${empleado.nombre}</td>
+                <td>${puesto.nombre}</td>
+                <td>${empleado.tipoContrato || 'N/A'}<td>${empleado.dni}</td>
+                <td class="flex space-x-2">
+                    <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                    <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                </td>
+            `;
+                    listaEmpleados.appendChild(tr);
+                });
+                lucide.createIcons();
+            };
+
+            const resetFormEmpleado = () => {
+                formEmpleado.reset();
+                empleadoIdInput.value = '';
+                formEmpleadoTitulo.textContent = 'Añadir Nuevo Empleado';
+                cancelarEdicionEmpleadoBtn.classList.add('hidden');
+            };
+
+            formEmpleado.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const id = empleadoIdInput.value;
+                const empleadoData = {
+                    id: id || `e_${Date.now()}`,
+                    nombre: document.getElementById('empleado-nombre').value,
+                    puestoId: document.getElementById('empleado-puesto').value,
+                    horas: document.getElementById('empleado-horas').value,
+                    tipoContrato: document.getElementById('empleado-tipo-contrato').value,
+                    dni: document.getElementById('empleado-dni').value,
+                    ss: document.getElementById('empleado-ss').value,
+                    antiguedad: document.getElementById('empleado-antiguedad').value,
+                    cotizacion: document.getElementById('empleado-cotizacion').value,
+                };
+
+                if (id) {
+                    empleados = empleados.map(e => e.id === id ? empleadoData : e);
+                } else {
+                    empleados.push(empleadoData);
+                }
+
+                saveToStorage('empleados', empleados);
+                renderEmpleados();
+                resetFormEmpleado();
+            });
+
+            cancelarEdicionEmpleadoBtn.addEventListener('click', resetFormEmpleado);
+
+            app.editarEmpleado = (id) => {
+                const empleado = empleados.find(e => e.id === id);
+                if (empleado) {
+                    empleadoIdInput.value = empleado.id;
+                    document.getElementById('empleado-nombre').value = empleado.nombre;
+                    document.getElementById('empleado-puesto').value = empleado.puestoId;
+                    document.getElementById('empleado-horas').value = empleado.horas;
+                    document.getElementById('empleado-tipo-contrato').value = empleado.tipoContrato;
+                    document.getElementById('empleado-dni').value = empleado.dni;
+                    document.getElementById('empleado-ss').value = empleado.ss;
+                    document.getElementById('empleado-antiguedad').value = empleado.antiguedad;
+                    document.getElementById('empleado-cotizacion').value = empleado.cotizacion;
+                    formEmpleadoTitulo.textContent = `Editar Empleado: ${empleado.nombre}`;
+                    cancelarEdicionEmpleadoBtn.classList.remove('hidden');
+                }
+            };
+
+            app.borrarEmpleado = (id) => {
+                showModal({
+                    title: 'Confirmar Borrado',
+                    message: '¿Estás seguro de que quieres borrar este empleado?',
+                    type: 'confirm',
+                    onConfirm: () => {
+                        empleados = empleados.filter(e => e.id !== id);
+                        saveToStorage('empleados', empleados);
+                        renderEmpleados();
+                    }
+                });
+            };
+
+            // ==========================================================
+            // --- LÓGICA DE ADMINISTRACIÓN ---
+            // ==========================================================
+            const formAdmin = document.getElementById('form-admin');
+            const adminFields = {
+                'ss-cc-empleado': 4.7000, 'ss-desempleo-empleado': 1.5500, 'ss-fp-empleado': 0.1000, 'ss-mei-empleado': 0.1300,
+                'ss-cc-empresa': 23.6000, 'ss-at-ep-empresa': 1.5000, 'ss-desempleo-ind-gen-empresa': 5.5000,
+                'ss-desempleo-ind-dis-empresa': 4.7000, 'ss-desempleo-tem-gen-empresa': 7.0500,
+                'ss-desempleo-tem-dis-empresa': 6.2500, 'ss-fp-empresa': 0.6500, 'ss-fogasa-empresa': 0.2000,
+            };
+
+            const loadConfigSS = () => {
+                const storedConfig = JSON.parse(localStorage.getItem('configSS')) || {};
+                configSS = storedConfig;
+                for (const [key, defaultValue] of Object.entries(adminFields)) {
+                    const input = document.getElementById(key);
+                    if (input) {
+                        input.value = configSS[key] !== undefined ? configSS[key] : defaultValue;
+                    }
+                }
+            };
+
+            if (formAdmin) {
+                formAdmin.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const newConfig = {};
+                    for (const key in adminFields) {
+                        const input = document.getElementById(key);
+                        if (input) { newConfig[key] = input.value; }
+                    }
+                    configSS = newConfig;
+                    localStorage.setItem('configSS', JSON.stringify(configSS));
+                    showModal({ title: 'Éxito', message: 'Configuración de SS guardada correctamente.' });
+                });
+            }
+
+            const adminTabs = document.querySelectorAll('#admin .tab-button');
+            const adminTabContents = document.querySelectorAll('#admin .admin-tab-content');
+
+            function showAdminTab(targetId) {
+                adminTabContents.forEach(content => {
+                    content.classList.toggle('active', content.id === targetId);
+                });
+                adminTabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.target === targetId);
+                });
+            }
+
+            adminTabs.forEach(tab => {
+                tab.addEventListener('click', () => showAdminTab(tab.dataset.target));
+            });
+
+            const listaDevengos = document.getElementById('lista-devengos');
+            const listaDeducciones = document.getElementById('lista-deducciones');
+            const formAddDevengo = document.getElementById('form-add-devengo');
+            const formAddDeduccion = document.getElementById('form-add-deduccion');
+
+            const renderConceptos = () => {
+                listaDevengos.innerHTML = '';
+                conceptos.devengos.forEach(nombre => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
+                    li.innerHTML = `<span>${nombre}</span>
+                            <button class="p-1 text-red-400 hover:text-red-200" onclick="app.borrarConcepto('devengos', '${nombre}')">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>`;
+                    listaDevengos.appendChild(li);
+                });
+
+                listaDeducciones.innerHTML = '';
+                conceptos.deducciones.forEach(nombre => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
+                    li.innerHTML = `<span>${nombre}</span>
+                            <button class="p-1 text-red-400 hover:text-red-200" onclick="app.borrarConcepto('deducciones', '${nombre}')">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>`;
+                    listaDeducciones.appendChild(li);
+                });
+                lucide.createIcons();
+            };
+
+            formAddDevengo.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('new-devengo-name');
+                const nombre = input.value.trim();
+                if (nombre && !conceptos.devengos.includes(nombre)) {
+                    conceptos.devengos.push(nombre);
+                    localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                    renderConceptos();
+                    input.value = '';
+                }
+            });
+
+            formAddDeduccion.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('new-deduccion-name');
+                const nombre = input.value.trim();
+                if (nombre && !conceptos.deducciones.includes(nombre)) {
+                    conceptos.deducciones.push(nombre);
+                    localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                    renderConceptos();
+                    input.value = '';
+                }
+            });
+
+            app.borrarConcepto = (tipo, nombre) => {
+                conceptos[tipo] = conceptos[tipo].filter(c => c !== nombre);
+                localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                renderConceptos();
+            };
+
+            // --- LÓGICA PARA EL FORMULARIO DE DATOS DE EMPRESA ---
+            const formEmpresa = document.getElementById('form-empresa');
+
+            const loadEmpresaData = () => {
+                document.getElementById('empresa-nombre').value = empresa.nombre || '';
+                document.getElementById('empresa-domicilio').value = empresa.domicilio || '';
+                document.getElementById('empresa-cif').value = empresa.cif || '';
+                document.getElementById('empresa-ccc').value = empresa.ccc || '';
+            };
+
+            formEmpresa.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const newEmpresaData = {
+                    nombre: document.getElementById('empresa-nombre').value,
+                    domicilio: document.getElementById('empresa-domicilio').value,
+                    cif: document.getElementById('empresa-cif').value,
+                    ccc: document.getElementById('empresa-ccc').value,
+                };
+                empresa = newEmpresaData;
+                localStorage.setItem('empresa', JSON.stringify(empresa));
+                showModal({ title: 'Éxito', message: 'Datos de la empresa guardados correctamente.' });
+            });
+
+            // --- LÓGICA PARA GESTIONAR TIPOS DE CONTRATO ---
+            const formAddContrato = document.getElementById('form-add-contrato');
+            const listaContratos = document.getElementById('lista-contratos');
+
+            const renderTiposContrato = () => {
+                listaContratos.innerHTML = '';
+                if (tiposContrato.length === 0 && tiposContrato.length === 0) {
+                    // Sugerencia para añadir los primeros si la lista está vacía
+                    tiposContrato.push('Indefinido', 'Temporal', 'Fijo-discontinuo', 'Formación y Aprendizaje', 'Prácticas');
+                }
+
+                tiposContrato.forEach(tipo => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
+                    li.innerHTML = `<span>${tipo}</span>
+                            <button class="p-1 text-red-400 hover:text-red-200" onclick="app.borrarTipoContrato('${tipo}')">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>`;
+                    listaContratos.appendChild(li);
+                });
+                lucide.createIcons();
+            };
+
+            formAddContrato.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('new-contrato-name');
+                const tipo = input.value.trim();
+                if (tipo && !tiposContrato.includes(tipo)) {
+                    tiposContrato.push(tipo);
+                    saveToStorage('tiposContrato', tiposContrato);
+                    renderTiposContrato();
+                    input.value = '';
+                }
+            });
+
+            app.borrarTipoContrato = (tipo) => {
+                tiposContrato = tiposContrato.filter(t => t !== tipo);
+                saveToStorage('tiposContrato', tiposContrato);
+                renderTiposContrato();
+            };
+
+            // --- LÓGICA PARA RELLENAR EL DROPDOWN DE CONTRATOS ---
+            const renderTiposContratoDropdown = () => {
+                const select = document.getElementById('empleado-tipo-contrato');
+                const currentValue = select.value; // Guardar valor actual si se está editando
+                select.innerHTML = '<option value="">-- Selecciona un tipo --</option>'; // Limpiar
+                tiposContrato.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo;
+                    option.textContent = tipo;
+                    select.appendChild(option);
+                });
+                select.value = currentValue; // Restaurar valor si existía
+            };
+
+            // --- LÓGICA PARA GESTIONAR USUARIOS ---
+            const formAddUsuario = document.getElementById('form-add-usuario');
+            const listaUsuarios = document.getElementById('lista-usuarios');
+            const loggedInUser = sessionStorage.getItem('loggedInUser'); // Get current user
+
+            const renderUsuariosList = () => {
+                listaUsuarios.innerHTML = '';
+                users.forEach(user => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
+                    let deleteButtonHtml = '';
+                    // Only allow deleting users other than 'admin'
+                    if (user.username !== 'admin') {
+                        deleteButtonHtml = `
+                    <button class="p-1 text-red-400 hover:text-red-200" onclick="app.borrarUsuario('${user.username}')">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>`;
+                    }
+                    li.innerHTML = `<span>${user.username}</span> ${deleteButtonHtml}`;
+                    listaUsuarios.appendChild(li);
+                });
+                lucide.createIcons();
+            };
+
+            formAddUsuario.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const usernameInput = document.getElementById('new-username');
+                const passwordInput = document.getElementById('new-password');
+                const newUsername = usernameInput.value.trim();
+                const newPassword = passwordInput.value; // Don't trim password
+
+                if (!newUsername || !newPassword) {
+                    showModal({ title: "Error", message: "Usuario y contraseña son obligatorios." });
+                    return;
+                }
+
+                // Check if user already exists
+                if (users.some(u => u.username === newUsername)) {
+                    showModal({ title: "Error", message: `El usuario '${newUsername}' ya existe.` });
+                    return;
+                }
+
+                // Hash the password (using the same method as in auth.js)
+                const newPasswordHash = CryptoJS.MD5(newPassword).toString();
+
+                // Add the new user
+                users.push({ username: newUsername, passwordHash: newPasswordHash });
+                saveToStorage('appUsers', users); // Use saveToStorage helper
+
+                // Update list and clear form
+                renderUsuariosList();
+                usernameInput.value = '';
+                passwordInput.value = '';
+                showModal({ title: "Éxito", message: `Usuario '${newUsername}' añadido.` });
+            });
+
+            app.borrarUsuario = (usernameToDelete) => {
+                if (usernameToDelete === 'admin') {
+                    showModal({ title: "Error", message: "No se puede borrar el usuario administrador." });
+                    return;
+                }
+                showModal({
+                    title: 'Confirmar Borrado',
+                    message: `¿Estás seguro de que quieres borrar al usuario '${usernameToDelete}'?`,
+                    type: 'confirm',
+                    onConfirm: () => {
+                        users = users.filter(u => u.username !== usernameToDelete);
+                        saveToStorage('appUsers', users);
+                        renderUsuariosList();
+                    }
+                });
+            };
+
+            // ==========================================================
+            // --- LÓGICA DE IMPORTAR/EXPORTAR DATOS ---
+            // ==========================================================
+            document.getElementById('exportar-datos').addEventListener('click', () => {
+                const dataToExport = { puestos, empleados, configSS, conceptos, empresa, tiposContrato };
+                const dataStr = JSON.stringify(dataToExport, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `datos_nominas_${new Date().toISOString().slice(0, 10)}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            });
+
+            const importFileInput = document.getElementById('import-file-input');
+            document.getElementById('importar-datos').addEventListener('click', () => importFileInput.click());
+
+            importFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.puestos && data.empleados && data.configSS && data.conceptos && data.empresa && data.tiposContrato) {
+                            showModal({
+                                title: 'Confirmar Importación',
+                                message: 'Esto reemplazará todos los datos actuales. ¿Estás seguro?',
+                                type: 'confirm',
+                                onConfirm: () => {
+                                    saveToStorage('puestos', data.puestos);
+                                    saveToStorage('empleados', data.empleados);
+                                    localStorage.setItem('configSS', JSON.stringify(data.configSS));
+                                    localStorage.setItem('conceptos', JSON.stringify(data.conceptos));
+                                    puestos = data.puestos; empleados = data.empleados; configSS = data.configSS; conceptos = data.conceptos;
+                                    saveToStorage('empresa', data.empresa);
+                                    empresa = data.empresa;
+                                    saveToStorage('tiposContrato', data.tiposContrato);
+                                    tiposContrato = data.tiposContrato;
+                                    init();
+                                    showModal({ title: 'Éxito', message: 'Datos importados correctamente.' });
+                                }
+                            });
+                        } else {
+                            showModal({ title: 'Error', message: 'El archivo no tiene el formato correcto.' });
+                        }
+                    } catch (error) {
+                        showModal({ title: 'Error', message: 'Error al leer el archivo JSON.' });
+                    } finally {
+                        importFileInput.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // ==========================================================
+            // --- LÓGICA DE GENERACIÓN DE NÓMINAS (UI) ---
+            // ==========================================================
+            const renderEmpleadosDropdownNomina = () => {
+                nominaEmpleadoSelect.innerHTML = '<option value="">Selecciona un empleado...</option>';
+                empleados.forEach(emp => {
+                    const option = document.createElement('option');
+                    option.value = emp.id;
+                    option.textContent = emp.nombre;
+                    nominaEmpleadoSelect.appendChild(option);
+                });
+            };
+
+            const otrosDevengosContainer = document.getElementById('otros-devengos-container');
+            const addDevengoBtn = document.getElementById('add-devengo-btn');
+            const otrasDeduccionesContainer = document.getElementById('otras-deducciones-container');
+            const addDeduccionBtn = document.getElementById('add-deduccion-btn');
+            const selectDevengo = document.getElementById('select-devengo');
+            const selectDeduccion = document.getElementById('select-deduccion');
+
+            // --- Elementos Nómina LOTE (NUEVOS) ---
+            const formNominaLote = document.getElementById('form-nomina-lote');
+            const nominaListaEmpleadosLote = document.getElementById('nomina-lista-empleados-lote');
+            const selectAllCheckboxLote = document.getElementById('seleccionar-todos-empleados-lote');
+            const nominaFechaInicioLote = document.getElementById('nomina-fecha-inicio-lote');
+            const nominaFechaFinLote = document.getElementById('nomina-fecha-fin-lote');
+            const nominaIrpfLote = document.getElementById('nomina-irpf-lote');
+            const selectDevengoLote = document.getElementById('select-devengo-lote');
+            const addDevengoLoteBtn = document.getElementById('add-devengo-lote-btn');
+            const otrosDevengosLoteContainer = document.getElementById('otros-devengos-lote-container');
+            const selectDeduccionLote = document.getElementById('select-deduccion-lote');
+            const addDeduccionLoteBtn = document.getElementById('add-deduccion-lote-btn');
+            const otrasDeduccionesLoteContainer = document.getElementById('otras-deducciones-lote-container');
+            const nominaLoteResultadoContainer = document.getElementById('nomina-lote-resultado-container');
+            const nominaLoteResultadoDiv = document.getElementById('nomina-lote-resultado');
+            const btnExportarLoteCsv = document.getElementById('btn-exportar-lote-csv');
+
+            let ultimoCalculo = null;
+
+            // --- ESTADO PARA DATOS ESPECÍFICOS DE LOTE ---
+            let batchEmployeeData = {}; // { empId: { bajaInicio, bajaFin, baseAnterior, irpf, devengos: [], deducciones: [] } }
+
+            const renderConceptoDropdowns = () => {
+                selectDevengo.innerHTML = '<option value="_manual_">-- Añadir concepto manual --</option>';
+                conceptos.devengos.forEach(c => {
+                    selectDevengo.innerHTML += `<option value="${c}">${c}</option>`;
+                });
+
+                selectDeduccion.innerHTML = '<option value="_manual_">-- Añadir concepto manual --</option>';
+                conceptos.deducciones.forEach(c => {
+                    selectDeduccion.innerHTML += `<option value="${c}">${c}</option>`;
+                });
+            };
+
+            const createConceptoRow = (type, conceptoNombre = '') => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center space-x-2';
+                const isManual = conceptoNombre === '';
+
+                div.innerHTML = `
+            ${isManual
+                        ? `<input type="text" class="w-full form-input p-1 text-sm ${type}-concepto" placeholder="Concepto">`
+                        : `<span class="w-full p-1 text-sm ${type}-concepto">${conceptoNombre}</span>`
+                    }
+            <input type="number" step="0.01" class="w-2/5 form-input p-1 text-sm ${type}-importe" placeholder="0.00">
+            <button type="button" class="p-1 text-red-500 hover:text-red-300 remove-concepto-btn">
+                <i data-lucide="x-circle" class="w-4 h-4"></i>
+            </button>
+        `;
+                lucide.createIcons({
+                    nodes: [div.querySelector('.remove-concepto-btn')]
+                });
+                return div;
+            };
+
+            addDevengoBtn.addEventListener('click', () => {
+                const conceptoSeleccionado = selectDevengo.value;
+                if (conceptoSeleccionado === '_manual_') {
+                    otrosDevengosContainer.appendChild(createConceptoRow('devengo'));
+                } else {
+                    otrosDevengosContainer.appendChild(createConceptoRow('devengo', conceptoSeleccionado));
+                }
+            });
+
+            addDeduccionBtn.addEventListener('click', () => {
+                const conceptoSeleccionado = selectDeduccion.value;
+                if (conceptoSeleccionado === '_manual_') {
+                    otrasDeduccionesContainer.appendChild(createConceptoRow('deduccion'));
+                } else {
+                    otrasDeduccionesContainer.appendChild(createConceptoRow('deduccion', conceptoSeleccionado));
+                }
+            });
+
+            formNomina.addEventListener('click', (e) => {
+                const removeBtn = e.target.closest('.remove-concepto-btn');
+                if (removeBtn) {
+                    removeBtn.parentElement.remove();
+                }
+            });
+
+            // --- NUEVO: Listener para resetear el formulario al cambiar de empleado ---
+
+            nominaEmpleadoSelect.addEventListener('change', () => {
+                // 1. Resetear fechas a las del mes actual
+                setDefaultNominaDates();
+
+                // 2. Limpiar campos opcionales (baja)
+                document.getElementById('nomina-baja-inicio').value = '';
+                document.getElementById('nomina-baja-fin').value = '';
+
+                // 3. Resetear IRPF a 0.00
+                document.getElementById('nomina-irpf').value = '0.00';
+
+                // 4. Limpiar contenedores de devengos y deducciones manuales
+                document.getElementById('otros-devengos-container').innerHTML = '';
+                document.getElementById('otras-deducciones-container').innerHTML = '';
+
+                // 5. Resetear los desplegables de conceptos predefinidos
+                document.getElementById('select-devengo').selectedIndex = 0;
+                document.getElementById('select-deduccion').selectedIndex = 0;
+
+                // 6. Ocultar y limpiar el área de resultados
+                const nominaResultadoContainer = document.getElementById('nomina-resultado-container');
+                const nominaResultadoDiv = document.getElementById('nomina-resultado');
+                const btnExportarNomina = document.getElementById('btn-exportar-nomina');
+                const btnExportarPdf = document.getElementById('btn-exportar-pdf');
+
+                nominaResultadoContainer.classList.add('hidden');
+                nominaResultadoDiv.innerHTML = '';
+                btnExportarNomina.style.display = 'none';
+                btnExportarPdf.style.display = 'none';
+            });
+
+            // Elementos Modo Manual
+            const manualModeToggle = document.getElementById('manual-mode-toggle');
+            const manualModeFields = document.getElementById('manual-mode-fields');
+            const fieldsetBaja = document.getElementById('fieldset-baja'); // Asegúrate de que este ID exista en el HTML
+
+            // Toggle Modo Manual
+            if (manualModeToggle) {
+                manualModeToggle.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        manualModeFields.classList.remove('hidden');
+                        if (fieldsetBaja) fieldsetBaja.classList.add('opacity-50', 'pointer-events-none');
+                    } else {
+                        manualModeFields.classList.add('hidden');
+                        if (fieldsetBaja) fieldsetBaja.classList.remove('opacity-50', 'pointer-events-none');
+                    }
+                });
+            }
+
+            formNomina.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const empleadoId = nominaEmpleadoSelect.value;
+                const fechaInicio = document.getElementById('nomina-fecha-inicio').value;
+                const fechaFin = document.getElementById('nomina-fecha-fin').value;
+                const fechaInicioBaja = document.getElementById('nomina-baja-inicio').value;
+                const fechaFinBaja = document.getElementById('nomina-baja-fin').value;
+                const baseMesAnterior = document.getElementById('nomina-base-mes-anterior').value;
+                const porcentajeIRPF = document.getElementById('nomina-irpf').value;
+
+                const otrosDevengos = Array.from(document.querySelectorAll('#otros-devengos-container .flex')).map(row => ({
+                    concepto: row.querySelector('.devengo-concepto').value || row.querySelector('.devengo-concepto').textContent,
+                    importe: parseFloat(row.querySelector('.devengo-importe').value) || 0
+                }));
+
+                const otrasDeducciones = Array.from(document.querySelectorAll('#otras-deducciones-container .flex')).map(row => ({
+                    concepto: row.querySelector('.deduccion-concepto').value || row.querySelector('.deduccion-concepto').textContent,
+                    importe: parseFloat(row.querySelector('.deduccion-importe').value) || 0
+                }));
+
+                if (!empleadoId) {
+                    showModal({ title: "Error", message: "Por favor, selecciona un empleado." });
+                    return;
+                }
+
+                const empleado = empleados.find(emp => emp.id === empleadoId);
+                const puesto = puestos.find(p => p.id === empleado.puestoId);
+
+                // Datos Manuales
+                let manualData = null;
+                if (manualModeToggle && manualModeToggle.checked) {
+                    manualData = {
+                        salarioBase: parseFloat(document.getElementById('manual-salario-base').value) || 0,
+                        prorrata: parseFloat(document.getElementById('manual-prorrata').value) || 0,
+                        plusConvenio: parseFloat(document.getElementById('manual-plus-convenio').value) || 0,
+                        baseCotizacion: parseFloat(document.getElementById('manual-base-cotizacion').value) || 0,
+                        prestacionBaja: parseFloat(document.getElementById('manual-prestacion-baja').value) || 0,
+                        complementoBaja: parseFloat(document.getElementById('manual-complemento-baja').value) || 0
+                    };
+                }
+
+                const nominaCalculada = calcularNomina(empleado, puesto, configSS, fechaInicio, fechaFin, fechaInicioBaja, fechaFinBaja, porcentajeIRPF, otrosDevengos, otrasDeducciones, baseMesAnterior, manualData);
+
+                if (nominaCalculada.error) {
+                    showModal({ title: "Error de Cálculo", message: nominaCalculada.error });
+                    nominaResultadoContainer.classList.add('hidden');
+                } else {
+                    ultimaNominaCalculada = {
+                        nomina: nominaCalculada,
+                        empleado: empleado,
+                        periodo: { inicio: fechaInicio, fin: fechaFin }
+                    };
+                    displayNominaResult(nominaCalculada, empleado);
+                }
+            });
+
+            const displayNominaResult = (nomina, empleado) => {
+                let otrosDevengosHtml = '';
+                if (nomina.otrosDevengos && nomina.otrosDevengos.length > 0) {
+                    nomina.otrosDevengos.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            otrosDevengosHtml += `<dt>${d.concepto || 'Otro Devengo'}</dt><dd>${d.importe} €</dd>`;
+                        }
+                    });
+                }
+
+                // --- NUEVO: Generar HTML para los conceptos de antigüedad dinámicos ---
+                let conceptosCalculadosHtml = '';
+                if (nomina.conceptosCalculados && nomina.conceptosCalculados.length > 0) {
+                    conceptosCalculadosHtml = nomina.conceptosCalculados.map(c =>
+                        `<dt>${c.nombre || c.concepto} ${c.periodos ? `(${c.periodos})` : ''}</dt><dd>${c.importe} €</dd>`
+                    ).join('');
+                }
+
+                let otrasDeduccionesHtml = '';
+                if (nomina.otrasDeducciones && nomina.otrasDeducciones.length > 0) {
+                    nomina.otrasDeducciones.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            otrasDeduccionesHtml += `<dt>&nbsp;&nbsp;&nbsp;${d.concepto || 'Otra Deducción'}</dt><dd>${d.importe} €</dd>`;
+                        }
+                    });
+                }
+
+                nominaResultadoDiv.innerHTML = `
+            <p class="text-lg font-semibold text-white mb-4">Nómina de ${empleado.nombre}</p>
+            <div class="space-y-6">
+                <div>
+                    <h4 class="font-semibold text-blue-400 mb-2 border-b border-gray-600 pb-1">I. DEVENGOS</h4>
+                    <dl class="nomina-result-grid">
+                        <dt>Salario Base (${nomina.diasTrabajados} días)</dt><dd>${nomina.salarioBasePeriodo} €</dd>
+                        <dt>Prorrata Pagas Extra</dt><dd>${nomina.prorrataExtraPeriodo} €</dd>
+                        
+                        ${conceptosCalculadosHtml}
+
+                        ${otrosDevengosHtml}
+                        ${nomina.complementoEnfermedadEmpresa > 0 ? `<dt>Complemento Empresa por Baja</dt><dd>${nomina.complementoEnfermedadEmpresa} €</dd>` : ''}
+                        ${nomina.diasBajaEnPeriodo > 0 ? `<dt>Prestación por Baja (${nomina.diasBajaEnPeriodo} días)</dt><dd>${nomina.prestacionEnfermedadLegal} €</dd>` : ''}
+                        <dt class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">A. TOTAL DEVENGADO</dt>
+                        <dd class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">${nomina.totalDevengos} €</dd>
+                    </dl>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-400 mb-2 border-b border-gray-600 pb-1">II. DEDUCCIONES</h4>
+                    <dl class="nomina-result-grid">
+                        <dt>Base de Cotización</dt><dd>${nomina.baseCotizacion} €</dd>
+                        <dt class="col-span-2 text-gray-400 text-sm pt-2">Aportaciones del trabajador a la S.S.</dt>
+                        <dt>&nbsp;&nbsp;&nbsp;Contingencias Comunes (${nomina.porcCC}%)</dt><dd>${nomina.deduccionCC} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;Desempleo (${nomina.porcDesempleo}%)</dt><dd>${nomina.deduccionDesempleo} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;Formación Profesional (${nomina.porcFP}%)</dt><dd>${nomina.deduccionFP} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;MEI (${nomina.porcMEI}%)</dt><dd>${nomina.deduccionMEI} €</dd>
+                        <dt class="col-span-2 text-gray-400 text-sm pt-2">Otras Deducciones</dt>
+                        <dt>&nbsp;&nbsp;&nbsp;IRPF (${nomina.porcentajeIRPF}%)</dt><dd>${nomina.deduccionIRPF} €</dd>
+                        ${otrasDeduccionesHtml}
+                        <dt class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">B. TOTAL A DEDUCIR</dt>
+                        <dd class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">${nomina.totalDeducciones} €</dd>
+                    </dl>
+                </div>
+                <div class="border-t-2 border-blue-400 pt-4">
+                    <dl class="nomina-result-grid text-lg">
+                        <dt class="font-bold text-gray-200">LÍQUIDO TOTAL A PERCIBIR (A-B)</dt>
+                        <dd class="font-bold text-green-400">${nomina.salarioNeto} €</dd>
+                    </dl>
+                </div>
+            </div>
+        `;
+                nominaResultadoContainer.classList.remove('hidden');
+                document.getElementById('btn-exportar-nomina').style.display = 'inline-flex';
+                document.getElementById('btn-exportar-pdf').style.display = 'inline-flex';
+                lucide.createIcons();
+            };
+
+            // --- LÓGICA PARA LA SELECCIÓN MÚLTIPLE DE EMPLEADOS (LOTE) ---
+            const renderEmployeeSelectionListLote = () => {
+                if (!nominaListaEmpleadosLote || !selectAllCheckboxLote) return;
+                nominaListaEmpleadosLote.innerHTML = '';
+
+                empleados.forEach(emp => {
+                    const div = document.createElement('div');
+                    div.className = 'employee-batch-item border border-gray-700 rounded-lg p-3 mb-2 bg-gray-800 flex items-center justify-between';
+                    div.dataset.empId = emp.id;
+
+                    // Check if this employee has custom data
+                    const hasCustomData = batchEmployeeData[emp.id] && (
+                        batchEmployeeData[emp.id].bajaInicio ||
+                        batchEmployeeData[emp.id].irpf ||
+                        (batchEmployeeData[emp.id].devengos && batchEmployeeData[emp.id].devengos.length > 0) ||
+                        (batchEmployeeData[emp.id].deducciones && batchEmployeeData[emp.id].deducciones.length > 0)
+                    );
+
+                    div.innerHTML = `
+                <div class="flex items-center">
+                    <input type="checkbox" id="emp-lote-${emp.id}" name="nomina_empleados_lote" value="${emp.id}" class="mr-3 h-5 w-5 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500">
+                    <div>
+                        <label for="emp-lote-${emp.id}" class="text-sm font-medium text-gray-200 cursor-pointer select-none block">${emp.nombre}</label>
+                        ${hasCustomData ? '<span class="text-xs text-blue-400 flex items-center mt-1"><i data-lucide="check-circle" class="w-3 h-3 mr-1"></i> Datos personalizados</span>' : ''}
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary text-xs py-1 px-3 open-batch-modal-btn">
+                    <i data-lucide="settings-2" class="w-4 h-4 mr-2"></i> Detalles
+                </button>
+            `;
+                    nominaListaEmpleadosLote.appendChild(div);
+                });
+                lucide.createIcons();
+
+                selectAllCheckboxLote.onchange = (e) => {
+                    const checkboxes = document.querySelectorAll('input[name="nomina_empleados_lote"]');
+                    checkboxes.forEach(checkbox => checkbox.checked = e.target.checked);
+                };
+            };
+
+            // --- LÓGICA DEL MODAL DE LOTE ---
+            const batchModalOverlay = document.getElementById('batch-employee-modal-overlay');
+            const batchModalTitle = document.getElementById('batch-modal-title');
+            const batchModalEmpId = document.getElementById('batch-modal-emp-id');
+            const batchModalExcludeCommon = document.getElementById('batch-modal-exclude-common');
+            const batchModalBajaInicio = document.getElementById('batch-modal-baja-inicio');
+            const batchModalBajaFin = document.getElementById('batch-modal-baja-fin');
+            const batchModalBaseAnterior = document.getElementById('batch-modal-base-anterior');
+            const batchModalIrpf = document.getElementById('batch-modal-irpf');
+            const batchModalDevengoSelect = document.getElementById('batch-modal-devengo-select');
+            const batchModalAddDevengoBtn = document.getElementById('batch-modal-add-devengo-btn');
+            const batchModalDevengosList = document.getElementById('batch-modal-devengos-list');
+            const batchModalDeduccionSelect = document.getElementById('batch-modal-deduccion-select');
+            const batchModalAddDeduccionBtn = document.getElementById('batch-modal-add-deduccion-btn');
+            const batchModalDeduccionesList = document.getElementById('batch-modal-deducciones-list');
+            const batchModalCancelBtn = document.getElementById('batch-modal-cancel-btn');
+            const batchModalSaveBtn = document.getElementById('batch-modal-save-btn');
+
+            // Variables temporales para el modal
+            let tempBatchDevengos = [];
+            let tempBatchDeducciones = [];
+
+            const openBatchEmployeeModal = (empId) => {
+                try {
+                    const emp = empleados.find(e => e.id === empId);
+                    if (!emp) return;
+
+                    batchModalEmpId.value = empId;
+                    batchModalTitle.textContent = `Detalles: ${emp.nombre}`;
+
+                    // Cargar datos existentes o defaults
+                    const data = batchEmployeeData[empId] || {};
+                    if (batchModalExcludeCommon) {
+                        batchModalExcludeCommon.checked = data.excludeCommon || false;
+                    }
+                    if (batchModalBajaInicio) batchModalBajaInicio.value = data.bajaInicio || '';
+                    if (batchModalBajaFin) batchModalBajaFin.value = data.bajaFin || '';
+                    if (batchModalBaseAnterior) batchModalBaseAnterior.value = data.baseAnterior || '';
+                    if (batchModalIrpf) batchModalIrpf.value = data.irpf || '';
+
+                    tempBatchDevengos = [...(data.devengos || [])];
+                    tempBatchDeducciones = [...(data.deducciones || [])];
+
+                    // Poblar selects
+                    if (batchModalDevengoSelect) {
+                        batchModalDevengoSelect.innerHTML = '<option value="">-- Selecciona --</option>' +
+                            (conceptos.devengos || []).map(c => `<option value="${c}">${c}</option>`).join('') +
+                            '<option value="_manual_">-- Manual --</option>';
+                    }
+
+                    if (batchModalDeduccionSelect) {
+                        batchModalDeduccionSelect.innerHTML = '<option value="">-- Selecciona --</option>' +
+                            (conceptos.deducciones || []).map(c => `<option value="${c}">${c}</option>`).join('') +
+                            '<option value="_manual_">-- Manual --</option>';
+                    }
+
+                    renderBatchModalLists();
+                    if (batchModalOverlay) batchModalOverlay.classList.remove('hidden');
+                } catch (error) {
+                    console.error("Error opening modal:", error);
+                    alert("Error al abrir el modal: " + error.message);
+                }
+            };
+
+            const renderBatchModalLists = () => {
+                batchModalDevengosList.innerHTML = '';
+                tempBatchDevengos.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center space-x-2 bg-gray-700 p-2 rounded';
+                    div.innerHTML = `
+                <span class="flex-1 text-sm text-gray-200">${item.concepto}</span>
+                <span class="text-sm font-mono text-blue-300">${item.importe.toFixed(2)} €</span>
+                <button type="button" class="text-red-400 hover:text-red-200" onclick="removeBatchModalItem('devengo', ${index})">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            `;
+                    batchModalDevengosList.appendChild(div);
+                });
+
+                batchModalDeduccionesList.innerHTML = '';
+                tempBatchDeducciones.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center space-x-2 bg-gray-700 p-2 rounded';
+                    div.innerHTML = `
+                <span class="flex-1 text-sm text-gray-200">${item.concepto}</span>
+                <span class="text-sm font-mono text-blue-300">${item.importe.toFixed(2)} €</span>
+                <button type="button" class="text-red-400 hover:text-red-200" onclick="removeBatchModalItem('deduccion', ${index})">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            `;
+                    batchModalDeduccionesList.appendChild(div);
+                });
+                lucide.createIcons();
+            };
+
+            // Helper global para onclick en HTML generado dinámicamente
+            window.removeBatchModalItem = (type, index) => {
+                if (type === 'devengo') tempBatchDevengos.splice(index, 1);
+                else tempBatchDeducciones.splice(index, 1);
+                renderBatchModalLists();
+            };
+
+            const addBatchModalItem = (type) => {
+                const select = type === 'devengo' ? batchModalDevengoSelect : batchModalDeduccionSelect;
+                const amountInput = type === 'devengo' ? document.getElementById('batch-modal-devengo-amount') : document.getElementById('batch-modal-deduccion-amount');
+
+                const val = select.value;
+                if (!val) {
+                    alert("Selecciona un concepto");
+                    return;
+                }
+
+                let concepto = val;
+                if (val === '_manual_') {
+                    concepto = prompt("Introduce el nombre del concepto:");
+                    if (!concepto) return;
+                }
+
+                const importe = parseFloat(amountInput.value);
+
+                if (isNaN(importe)) {
+                    alert("Introduce un importe válido");
+                    return;
+                }
+
+                const newItem = { concepto, importe };
+                if (type === 'devengo') tempBatchDevengos.push(newItem);
+                else tempBatchDeducciones.push(newItem);
+
+                select.value = '';
+                amountInput.value = ''; // Limpiar input
+                renderBatchModalLists();
+            };
+
+            batchModalAddDevengoBtn?.addEventListener('click', (e) => { e.preventDefault(); addBatchModalItem('devengo'); });
+            batchModalAddDeduccionBtn?.addEventListener('click', (e) => { e.preventDefault(); addBatchModalItem('deduccion'); });
+
+            batchModalCancelBtn.addEventListener('click', () => {
+                batchModalOverlay.classList.add('hidden');
+            });
+
+            batchModalSaveBtn.addEventListener('click', () => {
+                const empId = batchModalEmpId.value;
+                if (!empId) return;
+
+                batchEmployeeData[empId] = {
+                    excludeCommon: batchModalExcludeCommon.checked,
+                    bajaInicio: batchModalBajaInicio.value,
+                    bajaFin: batchModalBajaFin.value,
+                    baseAnterior: batchModalBaseAnterior.value,
+                    irpf: batchModalIrpf.value,
+                    devengos: tempBatchDevengos,
+                    deducciones: tempBatchDeducciones
+                };
+
+                batchModalOverlay.classList.add('hidden');
+                renderEmployeeSelectionListLote(); // Re-render to show indicators
+            });
+
+            // Delegación para abrir el modal (Global para asegurar que funcione tras re-render)
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.open-batch-modal-btn');
+                if (btn) {
+                    e.preventDefault(); // Evitar cualquier comportamiento por defecto (submit, etc.)
+                    e.stopPropagation(); // Evitar propagación
+                    const empId = btn.closest('.employee-batch-item').dataset.empId;
+                    openBatchEmployeeModal(empId);
+                }
+            });
+
+            // --- LÓGICA PARA LOS DESPLEGABLES DE CONCEPTOS DEL LOTE ---
+            const renderConceptoDropdownsLote = () => {
+                if (!selectDevengoLote || !selectDeduccionLote) return; // Comprobación
+                selectDevengoLote.innerHTML = '<option value="">-- Selecciona Devengo Común --</option>';
+                selectDeduccionLote.innerHTML = '<option value="">-- Selecciona Deducción Común --</option>';
+                (conceptos.devengos || []).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c; option.textContent = c;
+                    selectDevengoLote.appendChild(option);
+                });
+                (conceptos.deducciones || []).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c; option.textContent = c;
+                    selectDeduccionLote.appendChild(option);
+                });
+            };
+
+            // --- LÓGICA PARA AÑADIR/QUITAR CONCEPTOS COMUNES DEL LOTE ---
+            const addConceptoComunLote = (tipo) => {
+                const select = (tipo === 'devengo') ? selectDevengoLote : selectDeduccionLote;
+                const container = (tipo === 'devengo') ? otrosDevengosLoteContainer : otrasDeduccionesLoteContainer;
+                if (!select || !container) return; // Comprobación
+
+                const conceptoNombre = select.value;
+                if (!conceptoNombre) return;
+
+                const yaExiste = Array.from(container.children).some(div => div.dataset.concepto === conceptoNombre);
+                if (yaExiste) return;
+
+                const div = document.createElement('div');
+                div.className = 'flex items-center space-x-2 bg-gray-700 p-1 rounded text-sm';
+                div.dataset.concepto = conceptoNombre;
+                div.innerHTML = `
+            <span class="w-full ${tipo}-concepto">${conceptoNombre}</span>
+            <input type="number" step="0.01" class="w-2/5 form-input p-1 text-sm ${tipo}-importe-lote" placeholder="0.00" required> <button type="button" class="p-1 text-red-500 hover:text-red-300 remove-concepto-lote-btn"> <i data-lucide="x-circle" class="w-4 h-4"></i>
+            </button>
+        `;
+                container.appendChild(div);
+                lucide.createIcons({ nodes: [div.querySelector('.remove-concepto-lote-btn')] });
+                select.selectedIndex = 0;
+            };
+
+            // --- Listeners para Lote ---
+            addDevengoLoteBtn?.addEventListener('click', () => addConceptoComunLote('devengo'));
+            addDeduccionLoteBtn?.addEventListener('click', () => addConceptoComunLote('deduccion'));
+
+            otrosDevengosLoteContainer?.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-concepto-lote-btn')) e.target.closest('div').remove();
+            });
+            otrasDeduccionesLoteContainer?.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-concepto-lote-btn')) e.target.closest('div').remove();
+            });
+
+            // --- Listener Principal del Formulario de Lote ---
+            formNominaLote?.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                // Obtenemos los checkboxes seleccionados
+                const checkboxes = Array.from(document.querySelectorAll('input[name="nomina_empleados_lote"]:checked'));
+                if (checkboxes.length === 0) {
+                    showModal({ title: "Error", message: "Selecciona al menos un empleado." });
+                    return;
+                }
+
+                const fechaInicio = nominaFechaInicioLote.value;
+                const fechaFin = nominaFechaFinLote.value;
+                const porcentajeIRPFGeneral = nominaIrpfLote.value;
+
+                // Recopilar devengos/deducciones comunes del formulario de lote
+                const devengosComunes = Array.from(otrosDevengosLoteContainer.children).map(div => ({
+                    concepto: div.dataset.concepto,
+                    importe: parseFloat(div.querySelector('.devengo-importe-lote').value) || 0
+                }));
+                const deduccionesComunes = Array.from(otrasDeduccionesLoteContainer.children).map(div => ({
+                    concepto: div.dataset.concepto,
+                    importe: parseFloat(div.querySelector('.deduccion-importe-lote').value) || 0
+                }));
+
+                const resultados = [];
+                let huboErrores = false;
+
+                checkboxes.forEach(cb => {
+                    const id = cb.value;
+                    const empleado = empleados.find(emp => emp.id === id);
+                    const puesto = puestos.find(p => p.id === empleado?.puestoId);
+
+                    if (!empleado || !puesto) {
+                        resultados.push({ empleado: { nombre: `ID ${id} no encontrado` }, nomina: { error: "Empleado o puesto no encontrado." } });
+                        huboErrores = true;
+                        return;
+                    }
+
+                    // --- Extracción de Datos Específicos desde batchEmployeeData ---
+                    const data = batchEmployeeData[id] || {};
+
+                    const excludeCommon = data.excludeCommon || false;
+                    const fechaInicioBaja = data.bajaInicio || null;
+                    const fechaFinBaja = data.bajaFin || null;
+                    const baseMesAnterior = data.baseAnterior || null;
+
+                    const irpfEspecifico = data.irpf;
+                    const porcentajeIRPF = irpfEspecifico && irpfEspecifico !== '' ? irpfEspecifico : porcentajeIRPFGeneral;
+
+                    // Devengos Específicos
+                    const devengosEspecificos = data.devengos || [];
+
+                    // Deducciones Específicas
+                    const deduccionesEspecificas = data.deducciones || [];
+
+                    // Combinar Comunes + Específicos (Respetando el flag excludeCommon)
+                    const todosDevengos = excludeCommon ? [...devengosEspecificos] : [...devengosComunes, ...devengosEspecificos];
+                    const todasDeducciones = excludeCommon ? [...deduccionesEspecificas] : [...deduccionesComunes, ...deduccionesEspecificas];
+
+                    // Llamamos a calcularNomina con los datos combinados
+                    const nominaCalculada = calcularNomina(empleado, puesto, configSS, fechaInicio, fechaFin, fechaInicioBaja, fechaFinBaja, porcentajeIRPF, todosDevengos, todasDeducciones, baseMesAnterior);
+
+                    if (nominaCalculada.error) {
+                        huboErrores = true;
+                    }
+                    resultados.push({ empleado, puesto, nomina: nominaCalculada, periodo: { inicio: fechaInicio, fin: fechaFin } });
+                });
+
+                if (huboErrores) {
+                    showModal({ title: "Atención", message: "Se produjeron errores en el cálculo de algunas nóminas." });
+                }
+
+                ultimoCalculo = resultados; // Guardamos el array de resultados
+                displayBatchNominaResults(resultados);
+            });
+
+            // --- Función para Mostrar Resultados del Lote ---
+            const displayBatchNominaResults = (resultados) => {
+                if (!nominaLoteResultadoDiv || !nominaLoteResultadoContainer || !btnExportarLoteCsv) return; // Comprobación
+
+                let tableHTML = `<div class="overflow-x-auto"><table class="w-full data-table"><thead><tr>
+                           <th>Empleado</th><th>Total Devengado</th><th>Total Deducido</th><th>Líquido</th><th>Estado</th><th>Acciones</th>
+                         </tr></thead><tbody>`;
+
+                resultados.forEach((res, index) => {
+                    const { empleado, nomina } = res;
+                    if (nomina.error) {
+                        tableHTML += `<tr class="bg-red-900 bg-opacity-30"><td>${empleado.nombre}</td>
+                              <td colspan="3" class="text-center text-red-400">${nomina.error}</td>
+                              <td><span class="px-2 py-1 text-xs font-semibold text-red-100 bg-red-600 rounded-full">Error</span></td>
+                              <td></td></tr>`;
+                    } else {
+                        tableHTML += `<tr><td>${empleado.nombre}</td><td>${nomina.totalDevengos} €</td><td>${nomina.totalDeducciones} €</td>
+                               <td class="font-semibold text-green-400">${nomina.salarioNeto} €</td>
+                               <td><span class="px-2 py-1 text-xs font-semibold text-green-100 bg-green-600 rounded-full">OK</span></td>
+                               <td>
+                                   <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-detalle-lote" data-index="${index}">
+                                       <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver Detalle
+                                   </button>
+                               </td></tr>`;
+                    }
+                });
+                tableHTML += `</tbody></table></div>`;
+
+                nominaLoteResultadoDiv.innerHTML = tableHTML;
+                nominaLoteResultadoContainer.classList.remove('hidden');
+                btnExportarLoteCsv.style.display = 'inline-flex';
+                document.getElementById('btn-exportar-lote-pdf').style.display = 'inline-flex';
+                lucide.createIcons();
+            };
+
+            // --- Lógica del Modal de Detalle de Nómina ---
+            const nominaDetailModalOverlay = document.getElementById('nomina-detail-modal-overlay');
+            const nominaDetailModalTitle = document.getElementById('nomina-detail-modal-title');
+            const nominaDetailModalContent = document.getElementById('nomina-detail-modal-content');
+            const closeNominaDetailModalBtn = document.getElementById('close-nomina-detail-modal');
+            const btnCloseDetailModal = document.getElementById('btn-close-detail-modal');
+
+            const closeDetailModal = () => {
+                nominaDetailModalOverlay.classList.add('hidden');
+            };
+
+            closeNominaDetailModalBtn?.addEventListener('click', closeDetailModal);
+            btnCloseDetailModal?.addEventListener('click', closeDetailModal);
+
+            // Delegación para el botón "Ver Detalle"
+            nominaLoteResultadoDiv?.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-ver-detalle-lote');
+                if (btn) {
+                    const index = btn.dataset.index;
+                    const result = ultimoCalculo[index];
+                    if (result) {
+                        showNominaDetailInModal(result.nomina, result.empleado);
+                    }
+                }
+            });
+
+            const showNominaDetailInModal = (nomina, empleado) => {
+                if (nominaDetailModalTitle) {
+                    nominaDetailModalTitle.textContent = `Detalle de Nómina: ${empleado.nombre}`;
+                }
+
+                let otrosDevengosHtml = '';
+                if (nomina.otrosDevengos && nomina.otrosDevengos.length > 0) {
+                    nomina.otrosDevengos.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            otrosDevengosHtml += `<dt>${d.concepto || 'Otro Devengo'}</dt><dd>${d.importe} €</dd>`;
+                        }
+                    });
+                }
+
+                let conceptosCalculadosHtml = '';
+                if (nomina.conceptosCalculados && nomina.conceptosCalculados.length > 0) {
+                    conceptosCalculadosHtml = nomina.conceptosCalculados.map(c =>
+                        `<dt>${c.nombre || c.concepto} ${c.periodos ? `(${c.periodos})` : ''}</dt><dd>${c.importe} €</dd>`
+                    ).join('');
+                }
+
+                let otrasDeduccionesHtml = '';
+                if (nomina.otrasDeducciones && nomina.otrasDeducciones.length > 0) {
+                    nomina.otrasDeducciones.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            otrasDeduccionesHtml += `<dt>&nbsp;&nbsp;&nbsp;${d.concepto || 'Otra Deducción'}</dt><dd>${d.importe} €</dd>`;
+                        }
+                    });
+                }
+
+                nominaDetailModalContent.innerHTML = `
+            <div class="space-y-6">
+                <div>
+                    <h4 class="font-semibold text-blue-400 mb-2 border-b border-gray-600 pb-1">I. DEVENGOS</h4>
+                    <dl class="nomina-result-grid">
+                        <dt>Salario Base (${nomina.diasTrabajados} días)</dt><dd>${nomina.salarioBasePeriodo} €</dd>
+                        <dt>Prorrata Pagas Extra</dt><dd>${nomina.prorrataExtraPeriodo} €</dd>
+                        
+                        ${conceptosCalculadosHtml}
+
+                        ${otrosDevengosHtml}
+                        ${nomina.complementoEnfermedadEmpresa > 0 ? `<dt>Complemento Empresa por Baja</dt><dd>${nomina.complementoEnfermedadEmpresa} €</dd>` : ''}
+                        ${nomina.diasBajaEnPeriodo > 0 ? `<dt>Prestación por Baja (${nomina.diasBajaEnPeriodo} días)</dt><dd>${nomina.prestacionEnfermedadLegal} €</dd>` : ''}
+                        <dt class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">A. TOTAL DEVENGADO</dt>
+                        <dd class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">${nomina.totalDevengos} €</dd>
+                    </dl>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-400 mb-2 border-b border-gray-600 pb-1">II. DEDUCCIONES</h4>
+                    <dl class="nomina-result-grid">
+                        <dt>Base de Cotización</dt><dd>${nomina.baseCotizacion} €</dd>
+                        <dt class="col-span-2 text-gray-400 text-sm pt-2">Aportaciones del trabajador a la S.S.</dt>
+                        <dt>&nbsp;&nbsp;&nbsp;Contingencias Comunes (${nomina.porcCC}%)</dt><dd>${nomina.deduccionCC} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;Desempleo (${nomina.porcDesempleo}%)</dt><dd>${nomina.deduccionDesempleo} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;Formación Profesional (${nomina.porcFP}%)</dt><dd>${nomina.deduccionFP} €</dd>
+                        <dt>&nbsp;&nbsp;&nbsp;MEI (${nomina.porcMEI}%)</dt><dd>${nomina.deduccionMEI} €</dd>
+                        <dt class="col-span-2 text-gray-400 text-sm pt-2">Otras Deducciones</dt>
+                        <dt>&nbsp;&nbsp;&nbsp;IRPF (${nomina.porcentajeIRPF}%)</dt><dd>${nomina.deduccionIRPF} €</dd>
+                        ${otrasDeduccionesHtml}
+                        <dt class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">B. TOTAL A DEDUCIR</dt>
+                        <dd class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">${nomina.totalDeducciones} €</dd>
+                    </dl>
+                </div>
+                <div class="border-t-2 border-blue-400 pt-4">
+                    <dl class="nomina-result-grid text-lg">
+                        <dt class="font-bold text-gray-200">LÍQUIDO TOTAL A PERCIBIR (A-B)</dt>
+                        <dd class="font-bold text-green-400">${nomina.salarioNeto} €</dd>
+                    </dl>
+                </div>
+            </div>
+        `;
+                nominaDetailModalOverlay.classList.remove('hidden');
+            };
+
+            // --- Función para Exportar Lote a CSV ---
+            const exportarLoteCSV = () => {
+                if (!ultimoCalculo || !Array.isArray(ultimoCalculo) || ultimoCalculo.length === 0) {
+                    showModal({ title: "Error", message: "No hay datos de lote para exportar." });
+                    return;
+                }
+
+                // --- 1. Crear Cabeceras (Empleados) ---
+                const headers = ['Concepto'];
+                ultimoCalculo.forEach(res => {
+                    headers.push(res.empleado.nombre);
+                });
+
+                // --- 2. Definir los Conceptos Fijos (en orden) ---
+                const conceptosOrdenados = [
+                    // Devengos Fijos
+                    { key: 'salarioBasePeriodo', label: 'Salario Base' },
+                    { key: 'prorrataExtraPeriodo', label: 'Prorrata Pagas Extra' },
+                    // Marcador para antigüedad
+                    { type: 'dynamic', category: 'antiguedad', labelPrefix: '' },
+                    // Marcador para otros devengos
+                    { type: 'dynamic', category: 'otrosDevengos', labelPrefix: '' },
+                    { key: 'complementoEnfermedadEmpresa', label: 'Complemento Baja' },
+                    { key: 'prestacionEnfermedadLegal', label: 'Prestación Baja' },
+                    { key: 'totalDevengos', label: 'TOTAL DEVENGADO' },
+                    // Separador Visual (Opcional)
+                    { type: 'separator' },
+                    // Deducciones Fijas
+                    { key: 'baseCotizacion', label: 'Base Cotización' },
+                    { key: 'deduccionCC', label: 'Deducción CC' },
+                    { key: 'deduccionDesempleo', label: 'Deducción Desempleo' },
+                    { key: 'deduccionFP', label: 'Deducción FP' },
+                    { key: 'deduccionMEI', label: 'Deducción MEI' },
+                    { key: 'totalDeduccionesSS', label: 'Total Aportaciones S.S.' },
+                    { key: 'deduccionIRPF', label: 'Deducción IRPF' },
+                    // Marcador para otras deducciones
+                    { type: 'dynamic', category: 'otrasDeducciones', labelPrefix: 'Deducción: ' },
+                    { key: 'totalDeducciones', label: 'TOTAL DEDUCIDO' },
+                    // Separador Visual (Opcional)
+                    { type: 'separator' },
+                    // Neto
+                    { key: 'salarioNeto', label: 'LÍQUIDO A PERCIBIR' },
+                    // Separador Visual (Opcional)
+                    { type: 'separator' },
+                    // Aportaciones Empresa
+                    { key: 'aportacionEmpresaCC', label: 'Aport. Empresa CC' },
+                    { key: 'aportacionEmpresaATEP', label: 'Aport. Empresa AT y EP' },
+                    { key: 'aportacionEmpresaDesempleo', label: 'Aport. Empresa Desempleo' },
+                    { key: 'aportacionEmpresaFP', label: 'Aport. Empresa FP' },
+                    { key: 'aportacionEmpresaFogasa', label: 'Aport. Empresa FOGASA' },
+                    { key: 'totalAportacionesEmpresa', label: 'Total Aport. Empresa' },
+                    { key: 'totalCoste', label: 'Coste Total Empresa' },
+                ];
+
+                // --- 3. Recopilar TODOS los conceptos dinámicos únicos y sus valores por empleado ---
+                const dynamicConceptsData = {}; // { 'Concept Name': ['val1', 'val2', ...], ... }
+
+                ultimoCalculo.forEach((res, employeeIndex) => {
+                    if (res.nomina && !res.nomina.error) {
+                        // Conceptos de Antigüedad
+                        (res.nomina.conceptosCalculados || []).forEach(c => {
+                            const conceptName = `${c.nombre}`;
+                            if (!dynamicConceptsData[conceptName]) {
+                                dynamicConceptsData[conceptName] = Array(ultimoCalculo.length).fill('0,00');
+                            }
+                            dynamicConceptsData[conceptName][employeeIndex] = c.importe || '0,00';
+                        });
+                        // Otros Devengos Comunes
+                        (res.nomina.otrosDevengos || []).filter(d => parseFloat(d.importe) > 0).forEach(d => {
+                            const conceptName = d.concepto;
+                            if (!dynamicConceptsData[conceptName]) {
+                                dynamicConceptsData[conceptName] = Array(ultimoCalculo.length).fill('0,00');
+                            }
+                            dynamicConceptsData[conceptName][employeeIndex] = d.importe || '0,00';
+                        });
+                        // Otras Deducciones Comunes
+                        (res.nomina.otrasDeducciones || []).filter(d => parseFloat(d.importe) > 0).forEach(d => {
+                            const conceptName = `Deducción: ${d.concepto}`; // Usamos el prefijo como clave única
+                            if (!dynamicConceptsData[conceptName]) {
+                                dynamicConceptsData[conceptName] = Array(ultimoCalculo.length).fill('0,00');
+                            }
+                            dynamicConceptsData[conceptName][employeeIndex] = d.importe || '0,00';
+                        });
+                    } else {
+                        // Si hay error, necesitamos llenar placeholders en dynamicConceptsData
+                        Object.keys(dynamicConceptsData).forEach(conceptName => {
+                            if (!dynamicConceptsData[conceptName][employeeIndex]) { // Si no se llenó aún
+                                dynamicConceptsData[conceptName][employeeIndex] = 'ERROR';
+                            }
+                        });
+                    }
+                });
+
+                // Obtenemos las listas de nombres únicos para cada categoría dinámica
+                const nombresAntiguedad = Object.keys(dynamicConceptsData).filter(name => /.*\(\d+\)$/.test(name));
+                const nombresOtrosDevengos = Object.keys(dynamicConceptsData).filter(name => !/.*\(\d+\)$/.test(name) && !name.startsWith('Deducción: '));
+                const nombresOtrasDeducciones = Object.keys(dynamicConceptsData).filter(name => name.startsWith('Deducción: '));
+
+
+                // --- 4. Construir las Filas de Datos en Orden ---
+                const rows = [];
+                conceptosOrdenados.forEach(concepto => {
+                    if (concepto.type === 'separator') {
+                        rows.push(Array(headers.length).fill('')); // Fila vacía como separador
+                    } else if (concepto.type === 'dynamic') {
+                        // Insertar aquí las filas de conceptos dinámicos correspondientes
+                        let dynamicNames;
+                        if (concepto.category === 'antiguedad') dynamicNames = nombresAntiguedad;
+                        else if (concepto.category === 'otrosDevengos') dynamicNames = nombresOtrosDevengos;
+                        else if (concepto.category === 'otrasDeducciones') dynamicNames = nombresOtrasDeducciones;
+
+                        (dynamicNames || []).forEach(name => {
+                            // Usamos el prefijo definido si existe
+                            rows.push([`${concepto.labelPrefix || ''}${name}`, ...(dynamicConceptsData[name] || Array(ultimoCalculo.length).fill('0,00'))]);
+                        });
+                    } else {
+                        // Es un concepto fijo
+                        const row = [concepto.label];
+                        ultimoCalculo.forEach(res => {
+                            row.push(res.nomina.error ? 'ERROR' : (res.nomina[concepto.key] ?? '0,00'));
+                        });
+                        rows.push(row);
+                    }
+                });
+
+                // --- 5. Generar el Contenido CSV y Descargar (Sin cambios) ---
+                let csvContent = headers.join(';') + '\n';
+                rows.forEach(rowArray => {
+                    let processedRow = rowArray.map(item => `"${String(item ?? '').replace(/\./g, ',')}"`);
+                    csvContent += processedRow.join(';') + '\n';
+                });
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                const fechaInicioPeriodo = new Date(ultimoCalculo[0].periodo?.inicio + 'T00:00:00');
+                const mesNomina = fechaInicioPeriodo.toLocaleString('es-ES', { month: 'long' });
+                const anioNomina = fechaInicioPeriodo.getFullYear();
+                const fileName = `Nominas_${mesNomina}_${anioNomina}.csv`;
+                link.setAttribute("download", fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            // Listener para el botón de exportar lote CSV
+            btnExportarLoteCsv?.addEventListener('click', exportarLoteCSV);
+
+            // ==========================================================
+            // --- LÓGICA DE EXPORTACIÓN A CSV ---
+            // ==========================================================
+            const exportarNominaCSV = () => {
+                if (!ultimaNominaCalculada) {
+                    showModal({ title: "Error", message: "No hay datos de nómina para exportar." });
+                    return;
+                }
+
+                const { nomina, empleado, periodo } = ultimaNominaCalculada;
+
+                const headers = ['Concepto', 'Valor'];
+                let rows = [
+                    ['Empleado', empleado.nombre],
+                    ['DNI', empleado.dni],
+                    ['Periodo', `${periodo.inicio} al ${periodo.fin}`],
+                    [],
+                    ['--- DEVENGOS ---', ''],
+                    ['Salario Base', nomina.salarioBasePeriodo],
+                    ['Prorrata Pagas Extra', nomina.prorrataExtraPeriodo],
+                    ['CPP', nomina.cppPeriodo],
+                ];
+
+                if (nomina.otrosDevengos && nomina.otrosDevengos.length > 0) {
+                    nomina.otrosDevengos.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            rows.push([d.concepto || 'Otro Devengo', d.importe]);
+                        }
+                    });
+                }
+
+                rows.push(
+                    ['Complemento Baja', nomina.complementoEnfermedadEmpresa],
+                    ['Prestación Baja', nomina.prestacionEnfermedadLegal],
+                    ['TOTAL DEVENGADO', nomina.totalDevengos],
+                    [],
+                    ['--- DEDUCCIONES ---', '']
+                );
+
+                // --- SECCIÓN MODIFICADA ---
+                // En lugar de una sola línea, ahora desglosamos las cotizaciones de la S.S.
+                rows.push(
+                    [`Deducción S.S.: Contingencias Comunes (${nomina.porcCC}%)`, nomina.deduccionCC],
+                    [`Deducción S.S.: Desempleo (${nomina.porcDesempleo}%)`, nomina.deduccionDesempleo],
+                    [`Deducción S.S.: Formación Profesional (${nomina.porcFP}%)`, nomina.deduccionFP],
+                    [`Deducción S.S.: MEI (${nomina.porcMEI}%)`, nomina.deduccionMEI],
+                    ['Total Aportaciones S.S.', nomina.totalDeduccionesSS],
+                    ['IRPF', nomina.deduccionIRPF]
+                );
+                // --- FIN DE LA SECCIÓN MODIFICADA ---
+
+                if (nomina.otrasDeducciones && nomina.otrasDeducciones.length > 0) {
+                    nomina.otrasDeducciones.forEach(d => {
+                        if (parseFloat(d.importe) > 0) {
+                            rows.push([d.concepto || 'Otra Deducción', d.importe]);
+                        }
+                    });
+                }
+
+                rows.push(
+                    ['TOTAL DEDUCIDO', nomina.totalDeducciones],
+                    [],
+                    ['--- LÍQUIDO A PERCIBIR ---', ''],
+                    ['SALARIO NETO', nomina.salarioNeto]
+                );
+
+                // El delimitador se cambia a punto y coma (;) para mayor compatibilidad con Excel en español
+                let csvContent = headers.join(';') + '\n';
+                rows.forEach(rowArray => {
+                    // Reemplazamos el punto del decimal por una coma
+                    let processedRow = rowArray.map(item => `"${String(item).replace(/\./g, ',')}"`);
+                    csvContent += processedRow.join(';') + '\n';
+                });
+
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                const fileName = `nomina_${empleado.nombre.replace(/\s+/g, '_')}_${periodo.inicio}_${periodo.fin}.csv`;
+                link.setAttribute("download", fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            document.getElementById('btn-exportar-nomina').addEventListener('click', exportarNominaCSV);
+            document.getElementById('btn-exportar-pdf').addEventListener('click', () => {
+                if (ultimaNominaCalculada) {
+                    // Añadimos el objeto 'puesto' que necesita la función del PDF
+                    const datosCompletos = {
+                        ...ultimaNominaCalculada,
+                        puesto: puestos.find(p => p.id === ultimaNominaCalculada.empleado.puestoId),
+                        empresa: empresa
+                    };
+                    generarPdfNomina(datosCompletos);
+                } else {
+                    showModal({ title: "Error", message: "No hay datos de nómina para generar el PDF." });
+                }
+            });
+
+            document.getElementById('btn-exportar-lote-pdf')?.addEventListener('click', () => {
+                if (ultimoCalculo && Array.isArray(ultimoCalculo)) {
+                    // Pasamos la lista de resultados, los datos de la empresa y la lista completa de puestos
+                    generarPdfLote(ultimoCalculo, empresa, puestos);
+                } else {
+                    showModal({ title: "Error", message: "No hay datos de lote para generar el PDF." });
+                }
+            });
+
+
+            // ==========================================================
+            // --- INICIALIZACIÓN DE LA APP ---
+            // ==========================================================
+            function init() {
+                let hasBeenMigrated = false;
+                puestos = puestos.map(puesto => {
+                    // Si el puesto tiene 'cpp' pero no 'conceptosAdicionales', es del formato antiguo
+                    if (puesto.hasOwnProperty('cpp') && !puesto.hasOwnProperty('conceptosAdicionales')) {
+                        hasBeenMigrated = true;
+                        // Creamos el nuevo formato
+                        return {
+                            id: puesto.id,
+                            nombre: puesto.nombre,
+                            salario: puesto.salario,
+                            horas: puesto.horas,
+                            // Convertimos el antiguo CPP en el nuevo formato de concepto
+                            conceptosAdicionales: [{
+                                nombre: 'Antigüedad (Trienio)',
+                                importe: puesto.cpp,
+                                periodicidadAnios: '3'
+                            }]
+                        };
+                    }
+                    return puesto; // Si ya está en el nuevo formato, no lo tocamos
+                });
+
+                if (hasBeenMigrated) {
+                    saveToStorage('puestos', puestos);
+                    console.log('¡Éxito! Tus puestos de trabajo se han actualizado al nuevo formato.');
+                }
+
+                // --- LÓGICA DE LA PANTALLA DE CARGA ---
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loading-screen');
+                    const appContainer = document.getElementById('app-container');
+
+                    // Inicia el desvanecimiento de la pantalla de carga
+                    loadingScreen.style.opacity = '0';
+
+                    // Cuando termina la animación, la oculta por completo
+                    loadingScreen.addEventListener('transitionend', () => {
+                        loadingScreen.style.display = 'none';
+                    });
+
+                    // Muestra el contenedor de la aplicación
+                    appContainer.classList.remove('hidden');
+
+                    // Muestra la página de inicio o la última visitada
+                    const activePage = localStorage.getItem('activePage') || 'home-page';
+                    showPage(activePage);
+
+                }, 3500); // Duración de la pantalla de carga en milisegundos (1.5 segundos)
+
+
+                renderPuestos();
+                renderEmpleados();
+                loadConfigSS();
+
+                const activePage = localStorage.getItem('activePage') || 'puestos';
+                showPage(activePage);
+
+                navLinks.forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const targetId = e.currentTarget.dataset.target;
+                        showPage(targetId);
+                    });
+                });
+            }
+
+            init();
+        });
+
+        
+        // Referencia al botón
+        const btnGuardarNeon = document.getElementById('btn-guardar-neon');
+
+        // Interceptamos tu función de mostrar resultados para activar el botón
+        // IMPORTANTE: Asegúrate que esta línea va DESPUÉS de cargar nominas.js
+        const originalDisplay = window.displayNominaResult || displayNominaResult; 
+        
+        // Sobrescribimos la función global para mostrar el botón
+        displayNominaResult = function(nomina, empleado) {
+            if(originalDisplay) originalDisplay(nomina, empleado);
+            if(btnGuardarNeon) btnGuardarNeon.style.display = 'inline-flex';
+        };
+
+        if(btnGuardarNeon) {
+            btnGuardarNeon.addEventListener('click', async () => {
+                // Usamos la variable global 'ultimaNominaCalculada' de tu script original
+                if (typeof ultimaNominaCalculada === 'undefined' || !ultimaNominaCalculada) return;
+
+                const originalText = btnGuardarNeon.innerHTML;
+                btnGuardarNeon.textContent = 'Guardando...';
+                btnGuardarNeon.disabled = true;
+
+                try {
+                    const response = await fetch('/api/guardar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ultimaNominaCalculada)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert("✅ Nómina guardada en la base de datos correctamente.");
+                    } else {
+                        alert("❌ Error: " + data.error);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error de conexión con el servidor.");
+                } finally {
+                    btnGuardarNeon.innerHTML = originalText;
+                    btnGuardarNeon.disabled = false;
+                }
+            });
+        }
+
+    </script>
+</body>
+
+</html>
