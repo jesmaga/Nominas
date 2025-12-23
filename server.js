@@ -83,8 +83,8 @@ app.get('/api/historial', async (req, res) => {
 });
 
 // Ruta por defecto para cargar la app
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'login.html')); // O Index.html si no quieres login
+app.get('/(.*)', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 app.listen(port, () => {
