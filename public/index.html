@@ -1028,17 +1028,75 @@
             // --- ICONOS LUCIDE ---
             lucide.createIcons();
 
-            // --- LÓGICA COMÚN DE DATOS (LocalStorage) ---
-            const getFromStorage = (key) => JSON.parse(localStorage.getItem(key)) || [];
-            const saveToStorage = (key, data) => localStorage.setItem(key, JSON.stringify(data));
-
-            let puestos = getFromStorage('puestos');
-            let empleados = getFromStorage('empleados');
-            let configSS = JSON.parse(localStorage.getItem('configSS')) || {};
+            // --- NUEVA LÓGICA DE DATOS CON API ---
+            let puestos = [];
+            let empleados = [];
+            let configSS = JSON.parse(localStorage.getItem('configSS')) || {}; // Config local está bien
             let conceptos = JSON.parse(localStorage.getItem('conceptos')) || { devengos: [], deducciones: [] };
             let empresa = JSON.parse(localStorage.getItem('empresa')) || {};
-            let tiposContrato = getFromStorage('tiposContrato');
-            let users = getFromStorage('appUsers');
+            let tiposContrato = JSON.parse(localStorage.getItem('tiposContrato')) || [];
+            let users = [];
+
+            
+            // Función para guardar configuraciones genéricas en BD
+            const guardarConfigEnBD = async (clave, datos) => {
+                try {
+                    await fetch(`/api/config/${clave}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(datos)
+                    });
+                } catch (err) {
+                    console.error(`Error guardando ${clave}:`, err);
+                }
+            };
+
+            const loadDataFromDB = async () => {
+                try {
+                    // 1. Cargar Entidades Principales
+                    const resPuestos = await fetch('/api/puestos');
+                    puestos = await resPuestos.json() || [];
+
+                    const resEmpleados = await fetch('/api/empleados');
+                    empleados = await resEmpleados.json() || [];
+
+                    // 2. Cargar Configuraciones (Si devuelve null, usamos valor por defecto)
+                    const resEmpresa = await fetch('/api/config/empresa');
+                    const datosEmpresa = await resEmpresa.json();
+                    if (datosEmpresa) empresa = datosEmpresa;
+
+                    const resSS = await fetch('/api/config/ss');
+                    const datosSS = await resSS.json();
+                    if (datosSS) configSS = datosSS;
+                    
+                    const resConceptos = await fetch('/api/config/conceptos');
+                    const datosConceptos = await resConceptos.json();
+                    if (datosConceptos) conceptos = datosConceptos;
+
+                    const resContratos = await fetch('/api/config/contratos');
+                    const datosContratos = await resContratos.json();
+                    if (datosContratos) tiposContrato = datosContratos;
+
+                    // 3. Cargar Usuarios (Solo si es admin)
+                    if (sessionStorage.getItem('loggedInUser') === 'admin') {
+                        const resUsers = await fetch('/api/usuarios');
+                        users = await resUsers.json() || [];
+                    }
+
+                    // 4. Renderizar UI
+                    renderPuestos();
+                    renderEmpleados();
+                    loadConfigSS(); // Rellena los inputs de SS con lo descargado
+                    loadEmpresaData(); // Rellena los inputs de Empresa
+                    renderConceptos(); // Rellena listas de devengos/deducciones
+                    renderTiposContrato();
+                    if (sessionStorage.getItem('loggedInUser') === 'admin') renderUsuariosList();
+
+                    console.log("Todos los datos sincronizados con la Nube.");
+                } catch (err) {
+                    console.error("Error cargando datos:", err);
+                }
+            };
 
             // Variable para guardar el resultado de la última nómina calculada
             let ultimaNominaCalculada = null;
@@ -1211,32 +1269,82 @@
                 cancelarEdicionPuestoBtn.classList.add('hidden');
             };
 
-            formPuesto.addEventListener('submit', (e) => {
+            // --- LÓGICA DE GUARDADO DE PUESTOS EN BASE DE DATOS ---
+            formPuesto.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const id = puestoIdInput.value;
 
+                const id = puestoIdInput.value;
+                // Si no hay ID, generamos uno nuevo.
+                // Nota: Es importante mantener el formato string para el backend.
+                const finalId = id || `p_${Date.now()}`;
+
+                // 1. Recopilar Conceptos Adicionales (Antigüedad, etc.) del DOM
+                // (Esta lógica se mantiene igual que en tu versión local)
+                const conceptosContainer = document.getElementById('conceptos-adicionales-container');
                 const conceptosAdicionales = Array.from(conceptosContainer.children).map(div => {
-                    const [mainText] = div.querySelector('span').textContent.split(' - ');
-                    const [, importe, periodicidad] = div.querySelector('span').textContent.match(/(\d+\.?\d*)€ cada (\d+) año\(s\)/);
-                    return { nombre: mainText, importe, periodicidadAnios: periodicidad };
+                    const spanText = div.querySelector('span').textContent;
+                    // Parseamos el texto para sacar los valores: "Nombre - 100€ cada 3 año(s)"
+                    const [mainText] = spanText.split(' - ');
+                    const match = spanText.match(/(\d+\.?\d*)€ cada (\d+) año\(s\)/);
+                    
+                    let importe = '0';
+                    let periodicidad = '0';
+                    
+                    if (match) {
+                        importe = match[1];
+                        periodicidad = match[2];
+                    }
+
+                    return { 
+                        nombre: mainText, 
+                        importe: importe, 
+                        periodicidadAnios: periodicidad 
+                    };
                 });
+
+                // 2. Construir objeto de datos
                 const puestoData = {
-                    id: id || `p_${Date.now()}`,
+                    id: finalId,
                     nombre: document.getElementById('puesto-nombre').value,
                     salario: document.getElementById('puesto-salario').value,
                     horas: document.getElementById('puesto-horas').value,
                     conceptosAdicionales: conceptosAdicionales,
                 };
 
-                if (id) {
-                    puestos = puestos.map(p => p.id === id ? puestoData : p);
-                } else {
-                    puestos.push(puestoData);
-                }
+                // 3. Enviar a la Nube (API)
+                try {
+                    const submitBtn = formPuesto.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.textContent;
+                    submitBtn.textContent = "Guardando...";
+                    submitBtn.disabled = true;
 
-                saveToStorage('puestos', puestos);
-                renderPuestos();
-                resetFormPuesto();
+                    const response = await fetch('/api/puestos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(puestoData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // Recargar datos desde la BD para actualizar la tabla
+                        await loadDataFromDB(); 
+                        resetFormPuesto();
+                        showModal({ title: "Éxito", message: "Puesto guardado en la base de datos." });
+                    } else {
+                        throw new Error(result.error || "Error al guardar el puesto");
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    showModal({ title: "Error", message: "No se pudo guardar: " + error.message });
+                } finally {
+                    const submitBtn = formPuesto.querySelector('button[type="submit"]');
+                    if(submitBtn) {
+                        submitBtn.textContent = originalText || "Guardar Puesto";
+                        submitBtn.disabled = false;
+                    }
+                }
             });
 
             // --- LÓGICA PARA GESTIONAR CONCEPTOS DENTRO DE UN PUESTO ---
@@ -1316,21 +1424,42 @@
                 }
             };
 
+            // --- LÓGICA DE BORRADO DE PUESTOS EN BASE DE DATOS ---
             app.borrarPuesto = (id) => {
                 showModal({
                     title: 'Confirmar Borrado',
-                    message: '¿Estás seguro de que quieres borrar este puesto?',
+                    message: '¿Estás seguro de que quieres borrar este puesto de trabajo?',
                     type: 'confirm',
-                    onConfirm: () => {
+                    onConfirm: async () => {
+                        // 1. Validación local de seguridad
+                        // Verificamos si algún empleado en memoria usa este puesto
                         const empleadoEnPuesto = empleados.some(emp => emp.puestoId === id);
+                        
                         if (empleadoEnPuesto) {
-                            showModal({ title: 'Operación denegada', message: 'No se puede borrar el puesto porque hay empleados asignados a él.' });
+                            showModal({ 
+                                title: 'Operación denegada', 
+                                message: 'No se puede borrar el puesto porque hay empleados asignados a él. Cambia o borra los empleados primero.' 
+                            });
                             return;
                         }
-                        puestos = puestos.filter(p => p.id !== id);
-                        saveToStorage('puestos', puestos);
-                        renderPuestos();
-                        resetFormPuesto();
+
+                        // 2. Si pasa la validación, borramos en la BD
+                        try {
+                            const response = await fetch(`/api/puestos/${id}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            const result = await response.json();
+
+                            if (result.success) {
+                                await loadDataFromDB(); // Actualizamos la tabla visual
+                            } else {
+                                alert("Error al borrar: " + result.error);
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            alert("Error de conexión al intentar borrar.");
+                        }
                     }
                 });
             };
@@ -1368,11 +1497,19 @@
                 cancelarEdicionEmpleadoBtn.classList.add('hidden');
             };
 
-            formEmpleado.addEventListener('submit', (e) => {
+            // --- LÓGICA DE GUARDADO DE EMPLEADOS EN BASE DE DATOS ---
+            formEmpleado.addEventListener('submit', async (e) => {
                 e.preventDefault();
+
+                // 1. Capturamos el ID (si existe es edición, si no es nuevo)
                 const id = empleadoIdInput.value;
+                
+                // Si no tiene ID, generamos uno nuevo basado en la fecha
+                const finalId = id || `e_${Date.now()}`;
+
+                // 2. Recopilamos los datos del formulario
                 const empleadoData = {
-                    id: id || `e_${Date.now()}`,
+                    id: finalId,
                     nombre: document.getElementById('empleado-nombre').value,
                     puestoId: document.getElementById('empleado-puesto').value,
                     horas: document.getElementById('empleado-horas').value,
@@ -1383,15 +1520,50 @@
                     cotizacion: document.getElementById('empleado-cotizacion').value,
                 };
 
-                if (id) {
-                    empleados = empleados.map(e => e.id === id ? empleadoData : e);
-                } else {
-                    empleados.push(empleadoData);
-                }
+                // 3. Enviamos al Servidor (Render -> Neon)
+                try {
+                    // Bloqueamos el botón o mostramos carga (opcional pero recomendado)
+                    const submitBtn = formEmpleado.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.textContent;
+                    submitBtn.textContent = "Guardando...";
+                    submitBtn.disabled = true;
 
-                saveToStorage('empleados', empleados);
-                renderEmpleados();
-                resetFormEmpleado();
+                    const response = await fetch('/api/empleados', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(empleadoData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // 4. Si todo va bien: Recargamos datos y limpiamos formulario
+                        await loadDataFromDB(); // <--- Esta función recarga la lista desde la BD
+                        resetFormEmpleado();
+                        
+                        // Usamos tu modal personalizado
+                        showModal({ 
+                            title: "Éxito", 
+                            message: "Empleado guardado correctamente en la base de datos." 
+                        });
+                    } else {
+                        throw new Error(result.error || "Error desconocido al guardar");
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    showModal({ 
+                        title: "Error", 
+                        message: "No se pudo guardar el empleado: " + error.message 
+                    });
+                } finally {
+                    // Restauramos el botón
+                    const submitBtn = formEmpleado.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.textContent = originalText; // "Guardar Empleado"
+                        submitBtn.disabled = false;
+                    }
+                }
             });
 
             cancelarEdicionEmpleadoBtn.addEventListener('click', resetFormEmpleado);
@@ -1416,12 +1588,26 @@
             app.borrarEmpleado = (id) => {
                 showModal({
                     title: 'Confirmar Borrado',
-                    message: '¿Estás seguro de que quieres borrar este empleado?',
-                    type: 'confirm',
-                    onConfirm: () => {
-                        empleados = empleados.filter(e => e.id !== id);
-                        saveToStorage('empleados', empleados);
-                        renderEmpleados();
+                    message: '¿Estás seguro de que quieres borrar este empleado de la base de datos permanentemente?',
+                    type: 'confirm', // Esto activa los botones Aceptar/Cancelar en tu modal
+                    onConfirm: async () => {
+                        try {
+                            const response = await fetch(`/api/empleados/${id}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            const result = await response.json();
+
+                            if (result.success) {
+                                await loadDataFromDB(); // Recargamos la lista visualmente
+                                // Opcional: mostrar mensaje de éxito
+                            } else {
+                                alert("Error al borrar: " + (result.error || "Desconocido"));
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            alert("Error de conexión al intentar borrar.");
+                        }
                     }
                 });
             };
@@ -1449,7 +1635,7 @@
             };
 
             if (formAdmin) {
-                formAdmin.addEventListener('submit', (e) => {
+                formAdmin.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const newConfig = {};
                     for (const key in adminFields) {
@@ -1457,8 +1643,11 @@
                         if (input) { newConfig[key] = input.value; }
                     }
                     configSS = newConfig;
-                    localStorage.setItem('configSS', JSON.stringify(configSS));
-                    showModal({ title: 'Éxito', message: 'Configuración de SS guardada correctamente.' });
+                    
+                    // GUARDAR EN BD
+                    await guardarConfigEnBD('ss', configSS);
+                    
+                    showModal({ title: 'Éxito', message: 'Configuración de SS guardada en la base de datos.' });
                 });
             }
 
@@ -1508,33 +1697,36 @@
                 lucide.createIcons();
             };
 
-            formAddDevengo.addEventListener('submit', (e) => {
+            // Añadir Devengo
+            formAddDevengo.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const input = document.getElementById('new-devengo-name');
                 const nombre = input.value.trim();
                 if (nombre && !conceptos.devengos.includes(nombre)) {
                     conceptos.devengos.push(nombre);
-                    localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                    await guardarConfigEnBD('conceptos', conceptos); // Guardar
                     renderConceptos();
                     input.value = '';
                 }
             });
 
-            formAddDeduccion.addEventListener('submit', (e) => {
+            // Añadir Deducción
+            formAddDeduccion.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const input = document.getElementById('new-deduccion-name');
                 const nombre = input.value.trim();
                 if (nombre && !conceptos.deducciones.includes(nombre)) {
                     conceptos.deducciones.push(nombre);
-                    localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                    await guardarConfigEnBD('conceptos', conceptos); // Guardar
                     renderConceptos();
                     input.value = '';
                 }
             });
 
-            app.borrarConcepto = (tipo, nombre) => {
+            // Borrar Concepto
+            app.borrarConcepto = async (tipo, nombre) => {
                 conceptos[tipo] = conceptos[tipo].filter(c => c !== nombre);
-                localStorage.setItem('conceptos', JSON.stringify(conceptos));
+                await guardarConfigEnBD('conceptos', conceptos); // Guardar cambios
                 renderConceptos();
             };
 
@@ -1548,17 +1740,19 @@
                 document.getElementById('empresa-ccc').value = empresa.ccc || '';
             };
 
-            formEmpresa.addEventListener('submit', (e) => {
+            formEmpresa.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const newEmpresaData = {
+                empresa = {
                     nombre: document.getElementById('empresa-nombre').value,
                     domicilio: document.getElementById('empresa-domicilio').value,
                     cif: document.getElementById('empresa-cif').value,
                     ccc: document.getElementById('empresa-ccc').value,
                 };
-                empresa = newEmpresaData;
-                localStorage.setItem('empresa', JSON.stringify(empresa));
-                showModal({ title: 'Éxito', message: 'Datos de la empresa guardados correctamente.' });
+                
+                // GUARDAR EN BD
+                await guardarConfigEnBD('empresa', empresa);
+
+                showModal({ title: 'Éxito', message: 'Datos de la empresa guardados en la base de datos.' });
             });
 
             // --- LÓGICA PARA GESTIONAR TIPOS DE CONTRATO ---
@@ -1584,21 +1778,21 @@
                 lucide.createIcons();
             };
 
-            formAddContrato.addEventListener('submit', (e) => {
+            formAddContrato.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const input = document.getElementById('new-contrato-name');
                 const tipo = input.value.trim();
                 if (tipo && !tiposContrato.includes(tipo)) {
                     tiposContrato.push(tipo);
-                    saveToStorage('tiposContrato', tiposContrato);
+                    await guardarConfigEnBD('contratos', tiposContrato); // Guardar
                     renderTiposContrato();
                     input.value = '';
                 }
             });
 
-            app.borrarTipoContrato = (tipo) => {
+            app.borrarTipoContrato = async (tipo) => {
                 tiposContrato = tiposContrato.filter(t => t !== tipo);
-                saveToStorage('tiposContrato', tiposContrato);
+                await guardarConfigEnBD('contratos', tiposContrato); // Guardar
                 renderTiposContrato();
             };
 
@@ -1640,36 +1834,35 @@
                 lucide.createIcons();
             };
 
-            formAddUsuario.addEventListener('submit', (e) => {
+            formAddUsuario.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const usernameInput = document.getElementById('new-username');
                 const passwordInput = document.getElementById('new-password');
                 const newUsername = usernameInput.value.trim();
-                const newPassword = passwordInput.value; // Don't trim password
+                const newPassword = passwordInput.value;
 
-                if (!newUsername || !newPassword) {
-                    showModal({ title: "Error", message: "Usuario y contraseña son obligatorios." });
-                    return;
-                }
+                if (!newUsername || !newPassword) return;
 
-                // Check if user already exists
-                if (users.some(u => u.username === newUsername)) {
-                    showModal({ title: "Error", message: `El usuario '${newUsername}' ya existe.` });
-                    return;
-                }
-
-                // Hash the password (using the same method as in auth.js)
+                // Generar Hash en cliente (para mantener consistencia con auth.js)
                 const newPasswordHash = CryptoJS.MD5(newPassword).toString();
 
-                // Add the new user
-                users.push({ username: newUsername, passwordHash: newPasswordHash });
-                saveToStorage('appUsers', users); // Use saveToStorage helper
+                try {
+                    const response = await fetch('/api/usuarios', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: newUsername, passwordHash: newPasswordHash })
+                    });
 
-                // Update list and clear form
-                renderUsuariosList();
-                usernameInput.value = '';
-                passwordInput.value = '';
-                showModal({ title: "Éxito", message: `Usuario '${newUsername}' añadido.` });
+                    const res = await response.json();
+                    if(res.success) {
+                        await loadDataFromDB(); // Recargar lista
+                        usernameInput.value = '';
+                        passwordInput.value = '';
+                        showModal({ title: "Éxito", message: `Usuario '${newUsername}' añadido.` });
+                    } else {
+                        showModal({ title: "Error", message: res.error || "Error creando usuario." });
+                    }
+                } catch (err) { console.error(err); }
             });
 
             app.borrarUsuario = (usernameToDelete) => {
@@ -1679,12 +1872,13 @@
                 }
                 showModal({
                     title: 'Confirmar Borrado',
-                    message: `¿Estás seguro de que quieres borrar al usuario '${usernameToDelete}'?`,
+                    message: `¿Borrar usuario '${usernameToDelete}'?`,
                     type: 'confirm',
-                    onConfirm: () => {
-                        users = users.filter(u => u.username !== usernameToDelete);
-                        saveToStorage('appUsers', users);
-                        renderUsuariosList();
+                    onConfirm: async () => {
+                        try {
+                            await fetch(`/api/usuarios/${usernameToDelete}`, { method: 'DELETE' });
+                            await loadDataFromDB();
+                        } catch(err) { console.error(err); }
                     }
                 });
             };
@@ -2766,63 +2960,35 @@
             // --- INICIALIZACIÓN DE LA APP ---
             // ==========================================================
             function init() {
-                let hasBeenMigrated = false;
-                puestos = puestos.map(puesto => {
-                    // Si el puesto tiene 'cpp' pero no 'conceptosAdicionales', es del formato antiguo
-                    if (puesto.hasOwnProperty('cpp') && !puesto.hasOwnProperty('conceptosAdicionales')) {
-                        hasBeenMigrated = true;
-                        // Creamos el nuevo formato
-                        return {
-                            id: puesto.id,
-                            nombre: puesto.nombre,
-                            salario: puesto.salario,
-                            horas: puesto.horas,
-                            // Convertimos el antiguo CPP en el nuevo formato de concepto
-                            conceptosAdicionales: [{
-                                nombre: 'Antigüedad (Trienio)',
-                                importe: puesto.cpp,
-                                periodicidadAnios: '3'
-                            }]
-                        };
-                    }
-                    return puesto; // Si ya está en el nuevo formato, no lo tocamos
-                });
-
-                if (hasBeenMigrated) {
-                    saveToStorage('puestos', puestos);
-                    console.log('¡Éxito! Tus puestos de trabajo se han actualizado al nuevo formato.');
-                }
-
-                // --- LÓGICA DE LA PANTALLA DE CARGA ---
+                // 1. Lógica de Pantalla de Carga (Se mantiene igual)
                 setTimeout(() => {
                     const loadingScreen = document.getElementById('loading-screen');
                     const appContainer = document.getElementById('app-container');
 
-                    // Inicia el desvanecimiento de la pantalla de carga
+                    // Inicia el desvanecimiento
                     loadingScreen.style.opacity = '0';
 
-                    // Cuando termina la animación, la oculta por completo
                     loadingScreen.addEventListener('transitionend', () => {
                         loadingScreen.style.display = 'none';
                     });
 
-                    // Muestra el contenedor de la aplicación
                     appContainer.classList.remove('hidden');
 
-                    // Muestra la página de inicio o la última visitada
+                    // Navegación a la última página visitada
                     const activePage = localStorage.getItem('activePage') || 'home-page';
                     showPage(activePage);
 
-                }, 3500); // Duración de la pantalla de carga en milisegundos (1.5 segundos)
+                }, 3500);
 
-
-                renderPuestos();
-                renderEmpleados();
+                // 2. Cargar Configuración Local (SS, Empresa, etc. siguen en local por ahora)
                 loadConfigSS();
+                
+                // 3. CARGA DE DATOS DE LA BASE DE DATOS
+                // IMPORTANTE: Ya no llamamos a renderPuestos() aquí manualmente.
+                // La función loadDataFromDB() se encarga de descargar Y renderizar.
+                loadDataFromDB(); 
 
-                const activePage = localStorage.getItem('activePage') || 'puestos';
-                showPage(activePage);
-
+                // 4. Listeners de Navegación
                 navLinks.forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
