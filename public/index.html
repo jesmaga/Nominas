@@ -2595,63 +2595,68 @@
 
 
             // --- NUEVO: Listener para resetear el formulario al cambiar de empleado ---
-
             nominaEmpleadoSelect.addEventListener('change', () => {
-                // 1. Resetear fechas a las del mes actual
+                // 1. Resetear fechas
                 setDefaultNominaDates();
 
-                // 2. Limpiar campos opcionales (baja)
-                document.getElementById('nomina-baja-inicio').value = '';
-                document.getElementById('nomina-baja-fin').value = '';
+                // 2. Limpiar campos
+                const inputBajaInicio = document.getElementById('nomina-baja-inicio');
+                const inputBajaFin = document.getElementById('nomina-baja-fin');
+                if (inputBajaInicio) inputBajaInicio.value = '';
+                if (inputBajaFin) inputBajaFin.value = '';
 
-                // 3. Resetear IRPF a 0.00
-                document.getElementById('nomina-irpf').value = '0.00';
+                // 3. Resetear IRPF
+                const inputIrpf = document.getElementById('nomina-irpf');
+                if (inputIrpf) inputIrpf.value = '0.00';
 
-                // 4. Limpiar contenedores de devengos y deducciones manuales
-                document.getElementById('otros-devengos-container').innerHTML = '';
-                document.getElementById('otras-deducciones-container').innerHTML = '';
+                // 4. Limpiar contenedores
+                const containerDevengos = document.getElementById('otros-devengos-container');
+                const containerDeducciones = document.getElementById('otras-deducciones-container');
+                if (containerDevengos) containerDevengos.innerHTML = '';
+                if (containerDeducciones) containerDeducciones.innerHTML = '';
 
-                // 5. Resetear los desplegables de conceptos predefinidos
-                document.getElementById('select-devengo').selectedIndex = 0;
+                // 5. Resetear selects
+                const selDevengo = document.getElementById('select-devengo');
+                const selDeduccion = document.getElementById('select-deduccion');
+                if (selDevengo) selDevengo.selectedIndex = 0;
+                if (selDeduccion) selDeduccion.selectedIndex = 0;
 
-                document.getElementById('select-deduccion').selectedIndex = 0;
+                // 6. Ocultar resultados previos
+                const resultContainer = document.getElementById('nomina-resultado-container');
+                const resultDiv = document.getElementById('nomina-resultado');
+                if (resultContainer) resultContainer.classList.add('hidden');
+                if (resultDiv) resultDiv.innerHTML = '';
 
-                // 7. CÁLCULO AUTOMÁTICO DE RECOMENDACIÓN IRPF (MODELO 145 AVANZADO)
+                // --- CORRECCIÓN DEL ERROR btnAplicarIrpf ---
+                const irpfSugeridoLabel = document.getElementById('irpf-sugerido-label');
+                const btnAplicarIrpf = document.getElementById('btn-aplicar-irpf'); // Capturamos el botón
+
+                // Cálculo de recomendación IRPF
                 const empId = nominaEmpleadoSelect.value;
                 if (empId) {
                     const emp = empleados.find(e => e.id === empId);
                     const puesto = puestos.find(p => p.id === emp.puestoId);
-                    if (puesto && puesto.salario) {
-                        const brutoMensual = parseFloat(puesto.salario);
-                        const resultadoIrpf = calcularIRPFRecomendado(brutoMensual, 14, emp);
+                    
+                    // Solo intentamos calcular si tenemos elementos donde mostrarlo
+                    if (puesto && puesto.salario && typeof calcularIRPFRecomendado === 'function') {
+                        const resIrpf = calcularIRPFRecomendado(parseFloat(puesto.salario), 14, emp);
 
-                        if (resultadoIrpf) {
-                            irpfSugeridoLabel.innerHTML = `Sugerido: <strong>${resultadoIrpf.tipo}%</strong> <span class="text-xs text-gray-400">(${resultadoIrpf.info})</span>`;
-                            irpfSugeridoLabel.title = `Mínimo Personal/Familiar: ${resultadoIrpf.minimo}€. Cuota 1: ${resultadoIrpf.c1}€. Cuota 2: ${resultadoIrpf.c2}€.`;
-                            irpfSugeridoLabel.dataset.valor = resultadoIrpf.tipo;
-                            btnAplicarIrpf.style.display = 'inline-block';
+                        if (resIrpf) {
+                            if (irpfSugeridoLabel) {
+                                irpfSugeridoLabel.innerHTML = `Sugerido: <strong>${resIrpf.tipo}%</strong>`;
+                                irpfSugeridoLabel.dataset.valor = resIrpf.tipo;
+                            }
+                            // AQUÍ ESTABA EL ERROR: Verificamos que el botón exista antes de tocar su estilo
+                            if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'inline-block';
                         } else {
-                            irpfSugeridoLabel.textContent = "Sin tablas IRPF";
-                            btnAplicarIrpf.style.display = 'none';
+                            if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "Sin tablas IRPF";
+                            if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
                         }
                     }
                 } else {
-                    irpfSugeridoLabel.textContent = "";
-                    btnAplicarIrpf.style.display = 'none';
+                    if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "";
+                    if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
                 }
-
-                // 6. Ocultar y limpiar el área de resultados
-                const nominaResultadoContainer = document.getElementById('nomina-resultado-container');
-                const nominaResultadoDiv = document.getElementById('nomina-resultado');
-                const btnExportarNomina = document.getElementById('btn-exportar-nomina');
-                const btnExportarPdf = document.getElementById('btn-exportar-pdf');
-
-                nominaResultadoContainer.classList.add('hidden');
-                nominaResultadoDiv.innerHTML = '';
-                nominaResultadoDiv.innerHTML = '';
-                btnExportarNomina.style.display = 'none';
-                if (btnGuardarIndividualBd) btnGuardarIndividualBd.style.display = 'none';
-                btnExportarPdf.style.display = 'none';
             });
 
             // Elementos Modo Manual
@@ -3720,47 +3725,61 @@
                 });
             }
 
+            
             // 2. Guardado Lote
-            // 2. Guardado Lote
-
             if (btnGuardarLoteBd) {
                 btnGuardarLoteBd.addEventListener('click', async () => {
-                    if (!ultimoCalculo || ultimoCalculo.length === 0) return;
+                    // Verificamos que haya datos calculados
+                    if (!ultimoCalculo || !Array.isArray(ultimoCalculo) || ultimoCalculo.length === 0) {
+                        console.warn("No hay datos calculados para guardar.");
+                        return;
+                    }
 
                     const originalText = btnGuardarLoteBd.innerHTML;
                     btnGuardarLoteBd.disabled = true;
+                    btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Iniciando...`;
 
                     let guardados = 0;
                     let errores = 0;
 
+                    // Iteramos sobre el array de resultados 'ultimoCalculo'
                     for (let i = 0; i < ultimoCalculo.length; i++) {
                         const item = ultimoCalculo[i];
-                        // Si el cálculo dio error, lo saltamos
+
+                        // Si la nómina tiene error de cálculo, la saltamos
                         if (item.nomina.error) {
                             errores++;
                             continue;
                         }
 
-                        const fechaObj = new Date(item.periodo.inicio);
-                        const mesCalculado = fechaObj.getMonth() + 1;
-                        const anioCalculado = fechaObj.getFullYear();
+                        // --- CORRECCIÓN CRÍTICA PARA EL ERROR "NaN" ---
+                        // 1. Obtenemos la fecha de inicio del periodo de ESTE item
+                        const fechaString = item.periodo.inicio; 
+                        const fechaObj = new Date(fechaString);
 
-                        // Validación de seguridad
-                        if (isNaN(mesCalculado) || isNaN(anioCalculado)) {
-                            console.error(`Fecha inválida para ${item.empleado.nombre}`);
+                        // 2. Calculamos mes y año asegurando que sean números
+                        // Si la fecha es inválida, fechaObj.getMonth() devolverá NaN
+                        const mesCalculado = !isNaN(fechaObj.getTime()) ? (fechaObj.getMonth() + 1) : null;
+                        const anioCalculado = !isNaN(fechaObj.getTime()) ? fechaObj.getFullYear() : null;
+
+                        // 3. Si por alguna razón falló el cálculo, saltamos este registro para no romper la BD
+                        if (!mesCalculado || !anioCalculado) {
+                            console.error(`Fecha inválida para el empleado ${item.empleado.nombre}: ${fechaString}`);
                             errores++;
                             continue;
                         }
 
+                        // Actualizamos UI
                         btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando ${i + 1}/${ultimoCalculo.length}...`;
 
                         try {
+                            // Construimos el objeto a enviar
                             const payload = {
                                 empleado: item.empleado,
                                 periodo: item.periodo,
                                 nomina: item.nomina,
-                                mes: mesCalculado,
-                                anio: anioCalculado
+                                mes: mesCalculado,   // Integer
+                                anio: anioCalculado  // Integer
                             };
 
                             const response = await fetch('/api/guardar', {
@@ -3768,28 +3787,32 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(payload)
                             });
+                            
                             const result = await response.json();
 
                             if (result.success) {
                                 guardados++;
                             } else {
                                 errores++;
-                                console.error(`Error guardando nómina de ${item.empleado.nombre}:`, result.error);
+                                console.error(`Error Backend (${item.empleado.nombre}):`, result.error);
                             }
 
                         } catch (error) {
                             errores++;
-                            console.error(`Excepción guardando nómina de ${item.empleado.nombre}:`, error);
+                            console.error(`Error Red/Fetch (${item.empleado.nombre}):`, error);
                         }
                     }
 
+                    // Restaurar botón
                     btnGuardarLoteBd.innerHTML = originalText;
                     btnGuardarLoteBd.disabled = false;
-                    lucide.createIcons();
+                    
+                    // Re-inicializar iconos por si acaso
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
 
                     showModal({
                         title: "Proceso Finalizado",
-                        message: `Se han guardado ${guardados} nóminas correctamente.\nErrores/Omitidos: ${errores}`
+                        message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores: ${errores}`
                     });
                 });
             }
