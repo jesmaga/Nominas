@@ -220,6 +220,47 @@ app.post('/api/config/:id', async (req, res) => {
 });
 
 // --- NÓMINAS ---
+
+app.get('/api/nominas/base-anterior', async (req, res) => {
+    try {
+        const { empleadoId, fechaBaja } = req.query;
+
+        if (!empleadoId || !fechaBaja) {
+            return res.status(400).json({ error: 'Faltan parámetros: empleadoId, fechaBaja' });
+        }
+
+        // Parsear fecha baja (YYYY-MM-DD)
+        const dateBaja = new Date(fechaBaja);
+        // Queremos el mes anterior
+        // Restamos un mes a la fecha dada
+        dateBaja.setMonth(dateBaja.getMonth() - 1);
+
+        const targetAnio = dateBaja.getFullYear();
+        // getMonth() devuelve 0-11, sumamos 1 para guardar como 1-12
+        const targetMes = dateBaja.getMonth() + 1;
+
+        // Buscar en BD
+        const query = `
+            SELECT base_cc 
+            FROM nominas 
+            WHERE empleado_id = $1 AND anio = $2 AND mes = $3
+            LIMIT 1
+        `;
+
+        const result = await pool.query(query, [empleadoId, targetAnio, targetMes]);
+
+        if (result.rows.length > 0) {
+            res.json({ base: parseFloat(result.rows[0].base_cc) });
+        } else {
+            res.json({ base: null });
+        }
+
+    } catch (e) {
+        console.error("Error buscando base anterior:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/guardar', async (req, res) => {
     const { empleado, periodo, nomina } = req.body;
     try {
