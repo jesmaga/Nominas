@@ -261,10 +261,54 @@ app.get('/api/nominas/base-anterior', async (req, res) => {
     }
 });
 
+app.get('/api/nominas/acumulado', async (req, res) => {
+    try {
+        const { empleadoId, anio, mes } = req.query;
+
+        if (!empleadoId || !anio) {
+            return res.status(400).json({ error: 'Faltan parámetros: empleadoId, anio' });
+        }
+
+        // Si se paso mes, exlcuimos ese mes en adelante (para no sumar el mes que estamos calculando actualmente si ya existiera borrador)
+        // O simplemente sumamos todo lo ANTERIOR a ese mes.
+        // La consulta sumara todo lo del año dado para ese empleado
+        // Opcional: AND mes < $3
+
+        let query = `
+            SELECT 
+                COALESCE(SUM(total_devengado), 0) as total_ingresos,
+                COALESCE(SUM(cuota_irpf), 0) as total_retenido
+            FROM nominas
+            WHERE empleado_id = $1 AND anio = $2
+        `;
+
+        const params = [empleadoId, parseInt(anio)];
+
+        if (mes) {
+            query += ` AND mes < $3`;
+            params.push(parseInt(mes));
+        }
+
+        const result = await pool.query(query, params);
+
+        const acumulado = result.rows[0] || { total_ingresos: 0, total_retenido: 0 };
+
+        // Convert to numbers just in case
+        res.json({
+            totalIngresos: parseFloat(acumulado.total_ingresos),
+            totalRetenido: parseFloat(acumulado.total_retenido)
+        });
+
+    } catch (e) {
+        console.error("Error obteniendo acumulados:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/guardar', async (req, res) => {
     // 1. Extraemos también 'mes' y 'anio' del cuerpo de la petición
     const { empleado, periodo, nomina, mes, anio } = req.body;
-    
+
     try {
         // 2. Lógica de Fallback de seguridad:
         // Intentamos leer el año/mes enviados explícitamente.
@@ -308,7 +352,7 @@ app.post('/api/guardar', async (req, res) => {
 
         // Mapeo de campos corregido para coincidir con tu esquema de BD:
         // base_cc, base_cp, base_irpf, cuota_irpf, total_devengado, liquido_percibir
-        
+
         await pool.query(`
             INSERT INTO nominas (
                 empleado_id, anio, mes, dias_cotizados, 
@@ -317,11 +361,11 @@ app.post('/api/guardar', async (req, res) => {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, values);
-        
+
         res.json({ success: true });
-    } catch (e) { 
+    } catch (e) {
         console.error("Error SQL:", e);
-        res.status(500).json({ error: e.message }); 
+        res.status(500).json({ error: e.message });
     }
 });
 

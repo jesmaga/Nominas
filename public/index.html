@@ -2422,28 +2422,44 @@
             const irpfSugeridoLabel = document.getElementById('irpf-sugerido-label');
             const btnAplicarIrpf = document.getElementById('btn-aplicar-irpf');
 
-            const calcularIRPFRecomendado = (brutoMensual, pagas = 14, empleado = null) => {
+            const calcularIRPFRecomendado = (brutoMensual, pagas = 14, empleado = null, acumulados = { totalIngresos: 0, totalRetenido: 0 }, mesActual = 1) => {
                 const anioActual = new Date().getFullYear().toString();
 
                 // Cargar Tablas y Parámetros
                 const tramos = tablasIrpf[anioActual] || tablasIrpf["2024"] || Object.values(tablasIrpf)[0] || [];
                 const minParams = parametrosIrpf[anioActual] || {
-                    contribuyente: 5550,
-                    hijo1: 2400,
-                    hijo2: 2700,
-                    hijo3: 4000,
-                    ascendiente: 1150,
-                    discapacidad: 3000
+                    contribuyente: 5550, hijo1: 2400, hijo2: 2700, hijo3: 4000, ascendiente: 1150, discapacidad: 3000
                 };
 
                 if (tramos.length === 0) return null;
 
-                const brutoAnual = brutoMensual * pagas;
-                // En España hay una reducción general por gastos de trabajo de 2.000€
-                const gastosGenerales = 0; 
-                const baseImponible = Math.max(0, brutoAnual - gastosGenerales);
+                // --- 1. PROYECCIÓN DE INGRESOS (Regularización) ---
+                const ingresosAcumulados = acumulados.totalIngresos || 0;
+                const retencionesAcumuladas = acumulados.totalRetenido || 0;
 
-                // --- PASO 1: Calcular Mínimo Personal y Familiar ---
+                // Meses restantes incluyendo el actual
+                // Si mesActual = 1 (Enero), proyectamos 12 meses.
+                const mesesRestantes = 12 - mesActual + 1;
+
+                // Bruto Anual Teórico del Puesto
+                const anualTeoricoPuesto = brutoMensual * pagas;
+                // Ingreso Mensual Promedio (Prorrateado) para estimación
+                const mensualPromedio = anualTeoricoPuesto / 12;
+
+                let totalEstimado = 0;
+                if (ingresosAcumulados > 0 || mesActual > 1) {
+                    // Regularización: Lo que ya gané + Lo que espero ganar
+                    totalEstimado = ingresosAcumulados + (mensualPromedio * mesesRestantes);
+                } else {
+                    // Inicio de año: Proyección estándar
+                    totalEstimado = anualTeoricoPuesto;
+                }
+
+                // Gastos Generales (Reducción por rendimientos del trabajo estándar)
+                const gastosGenerales = 2000;
+                const baseImponible = Math.max(0, totalEstimado - gastosGenerales);
+
+                // --- 2. MÍNIMO PERSONAL Y FAMILIAR ---
                 let minimoPersonalFamiliar = minParams.contribuyente;
                 let infoFam = "Soltero/a sin cargas";
 
@@ -2452,71 +2468,74 @@
                     const ascendientes = parseInt(empleado.ascendientes) || 0;
                     const disc = parseFloat(empleado.discapacidad) || 0;
 
-                    let totalHijos = 0;
-                    if (hijos >= 1) totalHijos += minParams.hijo1;
-                    if (hijos >= 2) totalHijos += minParams.hijo2;
-                    if (hijos >= 3) totalHijos += (minParams.hijo3 * (hijos - 2));
+                    let extraHijos = 0;
+                    if (hijos >= 1) extraHijos += minParams.hijo1;
+                    if (hijos >= 2) extraHijos += minParams.hijo2;
+                    if (hijos >= 3) extraHijos += (minParams.hijo3 * (hijos - 2));
 
-                    const totalAsc = ascendientes * minParams.ascendiente;
-                    const totalDisc = (disc >= 33) ? minParams.discapacidad : 0;
-                    
-                    // Incremento por discapacidad severa o ascendientes (simplificado)
-                    
-                    minimoPersonalFamiliar += totalHijos + totalAsc + totalDisc;
+                    const extraAsc = ascendientes * minParams.ascendiente;
+                    const extraDisc = (disc >= 33) ? minParams.discapacidad : 0; // Simplificado
+
+                    minimoPersonalFamiliar += extraHijos + extraAsc + extraDisc;
 
                     if (hijos > 0 || ascendientes > 0 || disc > 0) {
                         infoFam = `${hijos} hijos, ${ascendientes} asc., Disc. ${disc}%`;
                     }
                 }
 
-                // --- NUEVA REGLA DE EXCLUSIÓN ---
-                // Si la Base Imponible (Ingresos - 2000) no supera el mínimo personal y familiar,
-                // la retención es legalmente 0%.
-                if (baseImponible <= minimoPersonalFamiliar) {
-                     return {
-                        tipo: "0.00",
-                        c1: "0.00",
-                        c2: "0.00",
-                        minimo: minimoPersonalFamiliar,
-                        info: infoFam + " (Exento / Bajo Mínimo)"
-                    };
-                }
-
-                // --- PASO 2: Función auxiliar cálculo cuota ---
+                // --- 3. CÁLCULO DE CUOTA LÍQUIDA ANUAL ---
                 const calcularCuota = (base, _tramos) => {
                     let cuota = 0;
                     const tramosOrdenados = [..._tramos].sort((a, b) => a.desde - b.desde);
 
                     for (const t of tramosOrdenados) {
-                        const limiteInferior = t.desde;
-                        const limiteSuperior = t.hasta || Infinity;
-                        const porcentaje = t.porcentaje;
-
-                        if (base > limiteInferior) {
-                            const baseImponibleTramo = Math.min(base, limiteSuperior) - limiteInferior;
-                            cuota += baseImponibleTramo * (porcentaje / 100);
+                        if (base > t.desde) {
+                            const limiteSuperior = t.hasta || Infinity;
+                            const baseTramo = Math.min(base, limiteSuperior) - t.desde;
+                            cuota += baseTramo * (t.porcentaje / 100);
                         }
                     }
                     return cuota;
                 };
 
-                // --- PASO 3: Calcular Cuota 1 (Sobre Base) y Cuota 2 (Sobre Mínimo) ---
-                // Aplicamos las tablas a la base (Bruto - Gastos) y al Mínimo
                 const cuota1 = calcularCuota(baseImponible, tramos);
                 const cuota2 = calcularCuota(minimoPersonalFamiliar, tramos);
+                const cuotaLiquidaAnual = Math.max(0, cuota1 - cuota2);
 
-                // --- PASO 4: Cuota Líquida ---
-                const cuotaLiquida = Math.max(0, cuota1 - cuota2);
+                // --- 4. TIPO A APLICAR (REGULARIZACIÓN) ---
+                // Cuota que falta por pagar
+                let cuotaRestante = cuotaLiquidaAnual - retencionesAcumuladas;
+                if (cuotaRestante < 0) cuotaRestante = 0; // Si ya ha pagado de más, 0 retención (se regulariza en Renta)
 
-                // --- PASO 5: Tipo Medio ---
-                const tipoMedio = (cuotaLiquida / brutoAnual) * 100;
+                // Base Futura sobre la que distribuir la cuota restante
+                const baseFutura = mensualPromedio * mesesRestantes;
+
+                let nuevoTipo = 0;
+                if (baseFutura > 0) {
+                    nuevoTipo = (cuotaRestante / baseFutura) * 100;
+                }
+
+                // --- 5. REGLAS MÍNIMAS (TEMPORAL) ---
+                let infoExtra = "";
+                if (ingresosAcumulados > 0) infoExtra = `(Regularizado)`;
+
+                if (empleado && empleado.tipoContrato) {
+                    const tipo = empleado.tipoContrato.toLowerCase();
+                    // Palabras clave para contratos temporales
+                    if (tipo.includes("temporal") || tipo.includes("obra") || tipo.includes("determinado") || tipo.includes("circunstancias")) {
+                        if (nuevoTipo < 2.00) {
+                            nuevoTipo = 2.00;
+                            infoExtra += " (Mín. Temporal)";
+                        }
+                    }
+                }
 
                 return {
-                    tipo: tipoMedio > 0 ? tipoMedio.toFixed(2) : "0.00",
+                    tipo: nuevoTipo.toFixed(2),
                     c1: cuota1.toFixed(2),
                     c2: cuota2.toFixed(2),
                     minimo: minimoPersonalFamiliar,
-                    info: infoFam
+                    info: infoFam + " " + infoExtra
                 };
             };
 
@@ -2612,9 +2631,9 @@
 
 
             // --- NUEVO: Listener para resetear el formulario al cambiar de empleado ---
-            nominaEmpleadoSelect.addEventListener('change', () => {
+            nominaEmpleadoSelect.addEventListener('change', async () => {
                 setDefaultNominaDates();
-                
+
                 // Limpieza segura de campos
                 const idsALimpiar = ['nomina-baja-inicio', 'nomina-baja-fin', 'otros-devengos-container', 'otras-deducciones-container', 'nomina-resultado'];
                 idsALimpiar.forEach(id => {
@@ -2630,7 +2649,7 @@
                 // --- CORRECCIÓN ERROR btnAplicarIrpf ---
                 const irpfSugeridoLabel = document.getElementById('irpf-sugerido-label');
                 const btnAplicarIrpf = document.getElementById('btn-aplicar-irpf');
-                
+
                 // Reset visual inicial
                 if (irpfSugeridoLabel) irpfSugeridoLabel.textContent = "";
                 if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'none';
@@ -2639,15 +2658,39 @@
                 if (empId) {
                     const emp = empleados.find(e => e.id === empId);
                     const puesto = puestos.find(p => p.id === emp?.puestoId);
-                    
+
                     // Solo calculamos si tenemos la función disponible
                     if (puesto && typeof calcularIRPFRecomendado === 'function') {
-                        const resIrpf = calcularIRPFRecomendado(parseFloat(puesto.salario), 14, emp);
+                        // FETCH ACUMULADOS (Regularización IRPF)
+                        let acumulados = { totalIngresos: 0, totalRetenido: 0 };
+                        const today = new Date();
+                        const currentYear = today.getFullYear();
+                        const currentMonth = today.getMonth() + 1; // 1-12
+
+                        try {
+                            const res = await fetch(`/api/nominas/acumulado?empleadoId=${empId}&anio=${currentYear}&mes=${currentMonth}`);
+                            if (res.ok) {
+                                acumulados = await res.json();
+                            }
+                        } catch (err) {
+                            console.error("Error fetching acumulados:", err);
+                        }
+
+                        // Llamada con acumulados
+                        const resIrpf = calcularIRPFRecomendado(parseFloat(puesto.salario), 14, emp, acumulados, currentMonth);
+
                         if (resIrpf) {
                             if (irpfSugeridoLabel) {
-                                irpfSugeridoLabel.innerHTML = `Sugerido: <strong>${resIrpf.tipo}%</strong>`;
+                                irpfSugeridoLabel.innerHTML = `Sugerido: <strong>${resIrpf.tipo}%</strong> <span class="text-gray-400 text-[10px] whitespace-nowrap">${resIrpf.info.split('(')[1] ? '(' + resIrpf.info.split('(')[1] : ''}</span>`;
+                                irpfSugeridoLabel.title = resIrpf.info;
                             }
-                            if (btnAplicarIrpf) btnAplicarIrpf.style.display = 'inline-block';
+                            if (btnAplicarIrpf) {
+                                btnAplicarIrpf.style.display = 'inline-block';
+                                btnAplicarIrpf.onclick = (e) => {
+                                    e.preventDefault();
+                                    if (inputIrpf) inputIrpf.value = resIrpf.tipo;
+                                };
+                            }
                         }
                     }
                 }
@@ -3688,7 +3731,7 @@
                     }
 
                     // Asignación segura
-                    ultimaNominaCalculada.mes = fechaObj.getMonth() + 1; 
+                    ultimaNominaCalculada.mes = fechaObj.getMonth() + 1;
                     ultimaNominaCalculada.anio = fechaObj.getFullYear();
 
                     const originalText = btnGuardarIndividualBd.innerHTML;
@@ -3746,7 +3789,7 @@
 
                         // --- CORRECCIÓN 2: Validar fechas para evitar NaN en mes/anio ---
                         const fechaObj = new Date(item.periodo.inicio);
-                        
+
                         // Verificamos si la fecha es válida
                         if (isNaN(fechaObj.getTime())) {
                             console.error(`Omitiendo ${item.empleado.nombre}: Fecha de inicio inválida.`);
@@ -3764,8 +3807,8 @@
                             const payload = {
                                 empleado: item.empleado,
                                 periodo: item.periodo,
-                                nomina: item.nomina, 
-                                mes: mesCalculado,   
+                                nomina: item.nomina,
+                                mes: mesCalculado,
                                 anio: anioCalculado
                             };
 
@@ -3774,7 +3817,7 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(payload)
                             });
-                            
+
                             const result = await response.json();
                             if (result.success) guardados++;
                             else {

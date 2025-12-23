@@ -1,0 +1,227 @@
+{
+  "puestos": [
+    {
+      "id": "p_1760119508066",
+      "horas": "38",
+      "nombre": "Educ. infantil",
+      "salario": "1245",
+      "conceptosAdicionales": [
+        {
+          "nombre": "CPP",
+          "importe": "26.37",
+          "periodicidadAnios": "3"
+        }
+      ]
+    },
+    {
+      "id": "p_1760212736265",
+      "horas": "35",
+      "nombre": "Dirección",
+      "salario": "1615",
+      "conceptosAdicionales": [
+        {
+          "nombre": "CPP",
+          "importe": "26.37",
+          "periodicidadAnios": "3"
+        }
+      ]
+    },
+    {
+      "id": "p_1760212761876",
+      "horas": "39",
+      "nombre": "Auxiliar",
+      "salario": "1184",
+      "conceptosAdicionales": [
+        {
+          "nombre": "CPP",
+          "importe": "19.04",
+          "periodicidadAnios": "3"
+        }
+      ]
+    },
+    {
+      "id": "p_1760212786662",
+      "horas": "38",
+      "nombre": "Pers. Limpieza",
+      "salario": "1184",
+      "conceptosAdicionales": [
+        {
+          "nombre": "CPP",
+          "importe": "19.04",
+          "periodicidadAnios": "3"
+        }
+      ]
+    },
+    {
+      "id": "p_1760212808047",
+      "horas": "30",
+      "nombre": "Prácticas",
+      "salario": "42.85",
+      "conceptosAdicionales": [
+        {
+          "nombre": "CPP",
+          "importe": "0",
+          "periodicidadAnios": "3"
+        }
+      ]
+    }
+  ],
+  "empleados": [
+    {
+      "id": "e_1760215784267",
+      "ss": "110063825454",
+      "dni": "31333165N",
+      "horas": "6",
+      "nombre": "GARRIDO GARCÍA, MARIA TERESA",
+      "puestoId": "p_1760212786662",
+      "antiguedad": "2005-11-02",
+      "cotizacion": "09",
+      "tipoContrato": "Indefinido"
+    },
+    {
+      "id": "e_1760215866105",
+      "ss": "111046923543",
+      "dni": "44964298B",
+      "horas": "25",
+      "nombre": "ARIAS SAMPER, INMACULADA",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2023-12-19",
+      "cotizacion": "09",
+      "tipoContrato": "Indefinido"
+    },
+    {
+      "id": "e_1760215900919",
+      "ss": "111052212265",
+      "dni": "75794831X",
+      "horas": "30",
+      "nombre": "RUÍZ COLLANTES, ALFONSO",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2020-09-01",
+      "cotizacion": "09",
+      "tipoContrato": "Indefinido"
+    },
+    {
+      "id": "e_1760215940169",
+      "ss": "111064169234",
+      "dni": "44967724X",
+      "horas": "25",
+      "nombre": "PEÑA VELAZQUEZ, MARIA",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2022-09-05",
+      "cotizacion": "09",
+      "tipoContrato": "Fijo-discontinuo"
+    },
+    {
+      "id": "e_1761683425855",
+      "ss": "111084352914",
+      "dni": "45389109N",
+      "horas": "10",
+      "nombre": "PINO BENITEZ, ELENA",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2025-10-01",
+      "cotizacion": "09",
+      "tipoContrato": "Indefinido"
+    },
+    {
+      "id": "e_1760209235200",
+      "ss": "111020535705",
+      "dni": "75786204P",
+      "hijos": "2",
+      "horas": "38",
+      "nombre": "MUÑOZ PEÑA, MARIA DEL PILAR",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2005-09-01",
+      "cotizacion": "09",
+      "estadoCivil": "casado",
+      "ascendientes": "0",
+      "discapacidad": "0",
+      "tipoContrato": "Indefinido",
+      "anioNacimiento": "1977"
+    },
+    {
+      "id": "e_1760212880550",
+      "ss": "111013167442",
+      "dni": "44963196J",
+      "hijos": "3",
+      "horas": "35",
+      "nombre": "MACÍAS GARCÍA, CRISTINA",
+      "puestoId": "p_1760212736265",
+      "antiguedad": "2004-04-01",
+      "cotizacion": "09",
+      "estadoCivil": "casado",
+      "ascendientes": "0",
+      "discapacidad": "0",
+      "tipoContrato": "Indefinido",
+      "anioNacimiento": "1976"
+    },
+    {
+      "id": "e_1760215685403",
+      "ss": "110077515184",
+      "dni": "31338916J",
+      "hijos": "2",
+      "horas": "35",
+      "nombre": "SAENZ ORDOÑEZ, JOSEFA MARIA",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2003-08-01",
+      "cotizacion": "09",
+      "estadoCivil": "casado",
+      "ascendientes": "0",
+      "discapacidad": "0",
+      "tipoContrato": "Indefinido",
+      "anioNacimiento": ""
+    },
+    {
+      "id": "e_1760215824764",
+      "ss": "111042830850",
+      "dni": "75786543W",
+      "hijos": "1",
+      "horas": "35",
+      "nombre": "MARROQUÍN CHAVES, BEATRIZ",
+      "puestoId": "p_1760119508066",
+      "antiguedad": "2006-09-01",
+      "cotizacion": "09",
+      "estadoCivil": "casado",
+      "ascendientes": "0",
+      "discapacidad": "0",
+      "tipoContrato": "Indefinido",
+      "anioNacimiento": ""
+    }
+  ],
+  "configSS": {
+    "ss-cc-empleado": "4.7",
+    "ss-desempleo-empleado": "1.55",
+    "ss-fp-empleado": "0.1",
+    "ss-mei-empleado": "0.13",
+    "ss-cc-empresa": "23.6",
+    "ss-at-ep-empresa": "1.5",
+    "ss-desempleo-ind-gen-empresa": "5.5",
+    "ss-desempleo-ind-dis-empresa": "4.7",
+    "ss-desempleo-tem-gen-empresa": "7.05",
+    "ss-desempleo-tem-dis-empresa": "6.25",
+    "ss-fp-empresa": "0.65",
+    "ss-fogasa-empresa": "0.2"
+  },
+  "conceptos": {
+    "devengos": [
+      "Complemento",
+      "Horas Extras",
+      "COMP. VOL. ABS. CON."
+    ],
+    "deducciones": [
+      "Anticipo"
+    ]
+  },
+  "empresa": {
+    "nombre": "GARCIA VAZQUEZ RAFAELA",
+    "domicilio": "ALVAR NUÑEZ, EDIFICIO OASIS 00",
+    "cif": "27905670T",
+    "ccc": "11104320530"
+  },
+  "tiposContrato": [
+    "Indefinido",
+    "Temporal",
+    "Fijo-discontinuo",
+    "Formación y Aprendizaje",
+    "Prácticas"
+  ]
+}
