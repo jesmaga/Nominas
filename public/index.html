@@ -3675,6 +3675,19 @@
                     btnGuardarIndividualBd.addEventListener('click', async () => {
                         if (!ultimaNominaCalculada) return;
 
+                        // Parseamos la fecha de inicio (formato YYYY-MM-DD)
+                        const fechaObj = new Date(ultimaNominaCalculada.periodo.inicio);
+                        
+                        // Corregimos los datos antes de enviarlos
+                        ultimaNominaCalculada.mes = fechaObj.getMonth() + 1; // getMonth() devuelve 0-11, sumamos 1
+                        ultimaNominaCalculada.anio = fechaObj.getFullYear();
+
+                        // Validación de seguridad por si la fecha es inválida
+                        if (isNaN(ultimaNominaCalculada.mes) || isNaN(ultimaNominaCalculada.anio)) {
+                            showModal({ title: "Error", message: "La fecha de la nómina no es válida. Revisa las fechas de inicio." });
+                            return;
+                        }
+
                         const originalText = btnGuardarIndividualBd.innerHTML;
                         btnGuardarIndividualBd.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando...';
                         btnGuardarIndividualBd.disabled = true;
@@ -3724,13 +3737,26 @@
                                 continue;
                             }
 
+                            const fechaObj = new Date(item.periodo.inicio);
+                            const mesCalculado = fechaObj.getMonth() + 1;
+                            const anioCalculado = fechaObj.getFullYear();
+
+                            // Validación de seguridad
+                            if (isNaN(mesCalculado) || isNaN(anioCalculado)) {
+                                console.error(`Fecha inválida para ${item.empleado.nombre}`);
+                                errores++;
+                                continue;
+                            }
+
                             btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando ${i + 1}/${ultimoCalculo.length}...`;
 
                             try {
                                 const payload = {
                                     empleado: item.empleado,
                                     periodo: item.periodo,
-                                    nomina: item.nomina
+                                    nomina: item.nomina,
+                                    mes: mesCalculado,
+                                    anio: anioCalculado
                                 };
 
                                 const response = await fetch('/api/guardar', {
