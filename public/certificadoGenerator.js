@@ -125,33 +125,35 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
         ]]
     });
 
-    // --- PIE DE PÁGINA (FIRMA Y SELLO) ---
-    y = doc.lastAutoTable.finalY + 15;
+    y = doc.lastAutoTable.finalY + 20;
+
+    // --- FIRMA Y SELLO ---
     const hoy = new Date();
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(`En EL PTO STA MARIA, a ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`, MARGIN, y);
+    doc.text(`En EL PUERTO DE STA MARIA, a ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`, MARGIN, y);
 
     y += 10;
     doc.text("Firma y sello de la empresa", MARGIN, y);
 
-    // --- INSERCIÓN DEL SELLO DESDE LOCALSTORAGE ---
-    let logoBase64 = localStorage.getItem('empresaLogo');
-    if (logoBase64 && logoBase64.trim() !== "") {
+    // --- CORRECCIÓN DEL ERROR ---
+    // 1. Buscamos la imagen en window.sello_pinocho O en localStorage (por si acaso)
+    // 2. Usamos 'let' para poder limpiarla
+    let imagenSello = window.sello_pinocho || localStorage.getItem('empresaLogo');
+
+    if (imagenSello) {
         try {
-            // Limpiar por si acaso tiene espacios o caracteres extras
-            logoBase64 = logoBase64.trim();
-            // Si no tiene el prefijo data:image, se lo añadimos (aunque suele tenerlo)
-            if (!logoBase64.startsWith('data:image')) {
-                logoBase64 = 'data:image/png;base64,' + logoBase64;
-            }
-            doc.addImage(logoBase64, 'PNG', MARGIN, y - 18, 40, 35);
+            // LIMPIEZA: Eliminamos saltos de línea (\n, \r) y espacios extras.
+            // Esto es lo que arregla el error "The string did not match the expected pattern"
+            const imgClean = imagenSello.trim().replace(/[\r\n]+/gm, "");
+
+            // Ajustamos posición (x, y, ancho, alto)
+            doc.addImage(imgClean, 'PNG', MARGIN, y - 15, 35, 30);
         } catch (e) {
-            console.error("Error al añadir el sello al PDF:", e);
+            console.error("Error insertando el sello (formato inválido):", e);
         }
     }
 
-    const fileName = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
-    doc.save(fileName);
+    // Guardar
+    const nombreArchivo = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
+    doc.save(nombreArchivo);
 }
