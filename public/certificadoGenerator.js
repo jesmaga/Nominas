@@ -1,6 +1,6 @@
 /**
  * Generador de Certificado de Empresa para desempleo (SEPE)
- * Basado en el estilo de pdfGenerator.js
+ * Basado estrictamente en el estilo de pdfGenerator.js
  */
 
 function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fechaBaja) {
@@ -9,7 +9,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
 
     // --- CONFIGURACIÓN DE ESTILO (Copiado de pdfGenerator.js) ---
     const MARGIN = 15;
-    const headerStartY = 15;
+    const headerStartY = 20; // Un poco más abajo que el título principal
     const boxHeight = 28;
     const lineHeight = 4.5;
     const separatorX = 102.5;
@@ -18,11 +18,12 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     const labelSize = 8;
     const valueSize = 10;
     const spaceAfterLabel = 1.5;
-    const blueColor = [0, 0, 139]; // Mismo color azul de la nómina
+    const blueColor = [0, 0, 139];
 
-    let y = headerStartY + 5;
+    const textRight = (text, y, x = 200) => {
+        doc.text(String(text), x, y, { align: 'right' });
+    };
 
-    // --- FUNCIONES DE AYUDA (Mismas de pdfGenerator.js) ---
     const drawHeaderLine = (label, value, x, yPos) => {
         doc.setFontSize(labelSize);
         doc.setFont("helvetica", "normal");
@@ -37,19 +38,21 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
         doc.text(String(value || ''), x + labelWidth + spaceAfterLabel, yPos);
     };
 
-    // --- TÍTULO PRINCIPAL ---
+    // --- TÍTULO PRINCIPAL (Centrado) ---
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
     doc.text("CERTIFICADO DE EMPRESA", 105, 10, { align: "center" });
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("SEPE / Ministerio de Trabajo y Economía Social", 105, 14, { align: "center" });
+    doc.text("Ministerio de Trabajo / SEPE", 105, 15, { align: "center" });
 
     // --- ESTRUCTURA DE CABECERA (RECUADRO) ---
     doc.setLineWidth(0.2);
     doc.rect(MARGIN, headerStartY, 185, boxHeight);
     doc.line(separatorX, headerStartY, separatorX, headerStartY + boxHeight);
+
+    let y = headerStartY + 5;
 
     // --- DATOS EMPRESA (Columna Izquierda) ---
     drawHeaderLine("Empresa:", empresa.nombre, col1X, y);
@@ -71,7 +74,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     drawHeaderLine("Nº Afiliación S.S.:", empleado.ss, col2X, y + (lineHeight * 2));
 
     // --- SECCIÓN: CAUSA DE EXTINCIÓN ---
-    y = headerStartY + boxHeight + 10;
+    y = headerStartY + boxHeight + 12;
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -80,23 +83,31 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.line(MARGIN, y, 200, y);
     y += 6;
 
-    doc.setFontSize(9);
+    doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
     doc.text(`Causa de extinción:`, MARGIN, y);
-    doc.setFont("helvetica", "bold");
+    doc.setFontSize(valueSize);
+    doc.setFont("courier", "bold");
+    doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
     doc.text(causa, MARGIN + 35, y);
 
-    y += 5;
+    y += 6;
     const fechaBajaFormat = new Date(fechaBaja).toLocaleDateString('es-ES');
+    doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
     doc.text(`Fecha de baja definitiva:`, MARGIN, y);
-    doc.setFont("helvetica", "bold");
+    doc.setFontSize(valueSize);
+    doc.setFont("courier", "bold");
+    doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
     doc.text(fechaBajaFormat, MARGIN + 40, y);
 
     // --- SECCIÓN: COTIZACIONES ---
     y += 12;
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("COTIZACIONES DE LOS ÚLTIMOS 180 DÍAS (Periodos reportados)", MARGIN, y);
+    doc.setTextColor(0, 0, 0);
+    doc.text("COTIZACIONES DE LOS ÚLTIMOS 180 DÍAS", MARGIN, y);
 
     const body = cotizaciones.map(c => [
         c.anio,
@@ -111,7 +122,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.autoTable({
         startY: y + 2,
         margin: { left: MARGIN, right: MARGIN },
-        theme: 'grid', // Estilo grid simple
+        theme: 'grid',
         headStyles: { fillGray: true, textColor: 0, fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8 },
         footStyles: { fillGray: true, textColor: 0, fontStyle: 'bold', fontSize: 8 },
@@ -125,35 +136,41 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
         ]]
     });
 
-    y = doc.lastAutoTable.finalY + 20;
+    // --- FIRMA Y SELLO (PIE DE PÁGINA) ---
+    // Posición fija al final si la tabla es corta, o relativa si es larga.
+    // Como son max 6-12 filas, usamos una constante para uniformidad
+    y = Math.max(doc.lastAutoTable.finalY + 20, 240);
 
-    // --- FIRMA Y SELLO ---
     const hoy = new Date();
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
     doc.text(`En EL PUERTO DE STA MARIA, a ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`, MARGIN, y);
 
-    y += 10;
+    y += 12;
+    doc.setFont("helvetica", "bold");
     doc.text("Firma y sello de la empresa", MARGIN, y);
 
-    // --- CORRECCIÓN DEL ERROR ---
-    // 1. Buscamos la imagen en window.sello_pinocho O en localStorage (por si acaso)
-    // 2. Usamos 'let' para poder limpiarla
-    let imagenSello = window.sello_pinocho || localStorage.getItem('empresaLogo');
-
-    if (imagenSello) {
+    // --- RECUPERACIÓN Y LIMPIEZA DEL SELLO ---
+    const logoBase64 = localStorage.getItem('empresaLogo');
+    if (logoBase64 && logoBase64.trim() !== "") {
         try {
-            // LIMPIEZA: Eliminamos saltos de línea (\n, \r) y espacios extras.
-            // Esto es lo que arregla el error "The string did not match the expected pattern"
-            const imgClean = imagenSello.trim().replace(/[\r\n]+/gm, "");
+            // Limpieza agresiva de saltos de línea y espacios (User Fix)
+            const imgClean = logoBase64.trim().replace(/[\r\n]+/gm, "");
 
-            // Ajustamos posición (x, y, ancho, alto)
-            doc.addImage(imgClean, 'PNG', MARGIN, y - 15, 35, 30);
+            // Si no tiene el prefijo de data URI, lo añadimos si parece base64 puro
+            let finalImg = imgClean;
+            if (!finalImg.startsWith('data:image')) {
+                finalImg = 'data:image/png;base64,' + imgClean;
+            }
+
+            doc.addImage(finalImg, 'PNG', MARGIN, y - 18, 40, 35);
         } catch (e) {
-            console.error("Error insertando el sello (formato inválido):", e);
+            console.error("Error al añadir el sello al PDF:", e);
         }
     }
 
-    // Guardar
-    const nombreArchivo = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
-    doc.save(nombreArchivo);
+    const fileName = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
 }
