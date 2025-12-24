@@ -3337,18 +3337,52 @@
                             <td>${periodoTexto}</td>
                             <td>${devengado} €</td>
                             <td class="font-bold text-green-400">${liquido} €</td>
-                            <td>
-                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial" data-id="${item.id}">
-                                    <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver/Imprimir
+                            <td class="flex space-x-2">
+                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial">
+                                    <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver
+                                </button>
+                                <button class="btn bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2 btn-borrar-historial">
+                                    <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Borrar
                                 </button>
                             </td>
                         `;
 
-                        // Guardamos el objeto completo en el DOM element para acceso rápido
-                        tr.querySelector('.btn-ver-historial').dataset.fullJson = JSON.stringify(item.datos_completo);
+                        // --- LÓGICA VER ---
+                        const btnVer = tr.querySelector('.btn-ver-historial');
+                        btnVer.onclick = () => {
+                            if (item.datos_completo) {
+                                (typeof app.verNomina === 'function') ? app.verNomina(item.datos_completo) : alert("No se pudo cargar el visualizador.");
+                            } else {
+                                alert("No hay datos detallados para esta nómina.");
+                            }
+                        };
+
+                        // --- LÓGICA BORRAR ---
+                        const btnBorrar = tr.querySelector('.btn-borrar-historial');
+                        btnBorrar.onclick = () => {
+                            showModal({
+                                title: 'Confirmar Borrado',
+                                message: `¿Estás seguro de que deseas borrar la nómina de ${nombreEmpleado} (${periodoTexto})? Esta acción no se puede deshacer.`,
+                                type: 'confirm',
+                                onConfirm: async () => {
+                                    try {
+                                        const res = await fetch(`/api/nominas/${item.id}`, { method: 'DELETE' });
+                                        if (res.ok) {
+                                            renderHistorial();
+                                        } else {
+                                            alert("Error al intentar borrar la nómina.");
+                                        }
+                                    } catch (err) {
+                                        console.error(err);
+                                        alert("Error de conexión.");
+                                    }
+                                }
+                            });
+                        };
 
                         tablaHistorialBody.appendChild(tr);
                     });
+
                     lucide.createIcons();
 
                 } catch (error) {
@@ -3785,51 +3819,67 @@
                 btnGuardarIndividualBd.addEventListener('click', async () => {
                     if (!ultimaNominaCalculada) return;
 
-                    // Parseamos la fecha de inicio
                     const fechaObj = new Date(ultimaNominaCalculada.periodo.inicio);
-
-                    // --- CORRECCIÓN: Validación de Fecha ---
                     if (isNaN(fechaObj.getTime())) {
-                        showModal({ title: "Error", message: "La fecha de inicio es inválida. No se puede determinar el mes y año para la base de datos." });
+                        showModal({ title: "Error", message: "La fecha de inicio es inválida." });
                         return;
                     }
 
-                    // Asignación segura
                     ultimaNominaCalculada.mes = fechaObj.getMonth() + 1;
                     ultimaNominaCalculada.anio = fechaObj.getFullYear();
 
-                    // Si por alguna razón viene vacío, usamos diasCalculoTotal
                     if (!ultimaNominaCalculada.nomina.diasCotizados) {
                         ultimaNominaCalculada.nomina.diasCotizados = ultimaNominaCalculada.nomina.diasCalculoTotal;
                     }
 
                     const originalText = btnGuardarIndividualBd.innerHTML;
-                    btnGuardarIndividualBd.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando...';
-                    btnGuardarIndividualBd.disabled = true;
-
-                    try {
-                        const response = await fetch('/api/guardar', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(ultimaNominaCalculada)
-                        });
-                        const result = await response.json();
-
-                        if (result.success) {
-                            showModal({ title: "Éxito", message: "Nómina guardada correctamente." });
+                    const setGuardando = (isSaving) => {
+                        if (isSaving) {
+                            btnGuardarIndividualBd.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando...';
+                            btnGuardarIndividualBd.disabled = true;
                         } else {
-                            throw new Error(result.error);
+                            btnGuardarIndividualBd.innerHTML = originalText;
+                            btnGuardarIndividualBd.disabled = false;
+                            lucide.createIcons();
                         }
-                    } catch (error) {
-                        console.error(error);
-                        showModal({ title: "Error", message: "Error al guardar: " + error.message });
-                    } finally {
-                        btnGuardarIndividualBd.innerHTML = originalText;
-                        btnGuardarIndividualBd.disabled = false;
-                        lucide.createIcons();
-                    }
+                    };
+
+                    const ejecutarGuardado = async (overwrite = false) => {
+                        setGuardando(true);
+                        try {
+                            const payload = { ...ultimaNominaCalculada, overwrite };
+                            const response = await fetch('/api/guardar', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            const result = await response.json();
+
+                            if (result.success) {
+                                showModal({ title: "Éxito", message: "Nómina guardada correctamente." });
+                            } else if (result.exists) {
+                                // Si existe, preguntamos si sobreescribir
+                                showModal({
+                                    title: 'Nómina Existente',
+                                    message: result.message,
+                                    type: 'confirm',
+                                    onConfirm: () => ejecutarGuardado(true) // Re-intentar con overwrite: true
+                                });
+                            } else {
+                                throw new Error(result.error || result.message || "Error desconocido");
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            showModal({ title: "Error", message: "Error al guardar: " + error.message });
+                        } finally {
+                            setGuardando(false);
+                        }
+                    };
+
+                    ejecutarGuardado(false);
                 });
             }
+
 
             // 2. Guardado Lote
             if (btnGuardarLoteBd) {

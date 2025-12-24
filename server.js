@@ -306,22 +306,17 @@ app.get('/api/nominas/acumulado', async (req, res) => {
 });
 
 app.post('/api/guardar', async (req, res) => {
-    // 1. Extraemos también 'mes' y 'anio' del cuerpo de la petición
-    const { empleado, periodo, nomina, mes, anio } = req.body;
+    // 1. Extraemos también 'mes' y 'anio' y el nuevo flag 'overwrite'
+    const { empleado, periodo, nomina, mes, anio, overwrite } = req.body;
 
     try {
         // 2. Lógica de Fallback de seguridad:
-        // Intentamos leer el año/mes enviados explícitamente.
-        // Si no existen, intentamos leerlos del objeto periodo.
-        // Si no existen, intentamos extraerlos de la fecha de inicio del periodo.
         let anioFinal = parseInt(anio);
         let mesFinal = parseInt(mes);
 
-        // Si falló lo anterior (es NaN), intentamos sacarlo del objeto periodo antiguo
         if (isNaN(anioFinal) && periodo && periodo.anio) anioFinal = parseInt(periodo.anio);
         if (isNaN(mesFinal) && periodo && periodo.mes) mesFinal = parseInt(periodo.mes);
 
-        // Si SIGUE siendo NaN, intentamos parsear la fecha string "YYYY-MM-DD"
         if ((isNaN(anioFinal) || isNaN(mesFinal)) && periodo && periodo.inicio) {
             const fechaObj = new Date(periodo.inicio);
             if (!isNaN(fechaObj.getTime())) {
@@ -330,28 +325,41 @@ app.post('/api/guardar', async (req, res) => {
             }
         }
 
-        // 3. ULTIMA DEFENSA: Si sigue siendo NaN, detenemos todo para no romper la BD
         if (isNaN(anioFinal) || isNaN(mesFinal)) {
             console.error("Error backend: Mes o Año son NaN", req.body);
             return res.status(400).json({ error: "No se pudo determinar el Mes o Año de la nómina. Verifique las fechas." });
         }
 
+        // --- PREVENCIÓN DE DUPLICADOS ---
+        const checkQuery = `SELECT id FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3`;
+        const checkResult = await pool.query(checkQuery, [empleado.id, anioFinal, mesFinal]);
+
+        if (checkResult.rows.length > 0) {
+            if (!overwrite) {
+                return res.json({
+                    success: false,
+                    exists: true,
+                    message: `Ya existe una nómina para ${empleado.nombre} en ${mesFinal}/${anioFinal}. ¿Deseas sobreescribirla?`
+                });
+            } else {
+                // Si overwrite es true, borramos el registro anterior antes de insertar el nuevo
+                await pool.query(`DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3`, [empleado.id, anioFinal, mesFinal]);
+            }
+        }
+
         const values = [
             empleado.id,
-            anioFinal, // Usamos la variable calculada y limpia
-            mesFinal,  // Usamos la variable calculada y limpia
+            anioFinal,
+            mesFinal,
             parseFloat(nomina.diasCotizados || 0),
-            parseFloat(nomina.baseContingenciasComunes || 0), // OJO: Asegúrate que el frontend manda este nombre exacto o usa nomina.baseCotizacion
+            parseFloat(nomina.baseContingenciasComunes || 0),
             parseFloat(nomina.baseContingenciasProfesionales || 0),
             parseFloat(nomina.baseIRPF || 0),
-            parseFloat(nomina.cuotaIRPF || nomina.deduccionIRPF || 0), // Fallback por si cambia el nombre
+            parseFloat(nomina.cuotaIRPF || nomina.deduccionIRPF || 0),
             parseFloat(nomina.totalDevengado || nomina.totalDevengos || 0),
             parseFloat(nomina.salarioNeto || 0),
             JSON.stringify(req.body)
         ];
-
-        // Mapeo de campos corregido para coincidir con tu esquema de BD:
-        // base_cc, base_cp, base_irpf, cuota_irpf, total_devengado, liquido_percibir
 
         await pool.query(`
             INSERT INTO nominas (
@@ -368,6 +376,19 @@ app.post('/api/guardar', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// --- ENDPOINT: Borrar nómina por ID ---
+app.delete('/api/nominas/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM nominas WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Error al borrar nómina:", err);
+        res.status(500).json({ error: "Error al borrar la nómina del servidor" });
+    }
+});
+
 
 app.get('/api/historial', async (req, res) => {
     try {

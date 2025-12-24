@@ -1,76 +1,103 @@
 /**
  * Generador de Certificado de Empresa para desempleo (SEPE)
- * Utiliza jsPDF y jsPDF-AutoTable
+ * Basado en el estilo de pdfGenerator.js
  */
 
 function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fechaBaja) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
+
+    // --- CONFIGURACIÓN DE ESTILO (Copiado de pdfGenerator.js) ---
     const MARGIN = 15;
-    let y = 20;
+    const headerStartY = 15;
+    const boxHeight = 28;
+    const lineHeight = 4.5;
+    const separatorX = 102.5;
+    const col1X = MARGIN + 2;
+    const col2X = separatorX + 2;
+    const labelSize = 8;
+    const valueSize = 10;
+    const spaceAfterLabel = 1.5;
+    const blueColor = [0, 0, 139]; // Mismo color azul de la nómina
 
-    // --- CABECERA ---
+    let y = headerStartY + 5;
+
+    // --- FUNCIONES DE AYUDA (Mismas de pdfGenerator.js) ---
+    const drawHeaderLine = (label, value, x, yPos) => {
+        doc.setFontSize(labelSize);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 0, 0);
+        doc.text(label, x, yPos);
+
+        const labelWidth = doc.getTextWidth(label);
+
+        doc.setFontSize(valueSize);
+        doc.setFont("courier", "bold");
+        doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
+        doc.text(String(value || ''), x + labelWidth + spaceAfterLabel, yPos);
+    };
+
+    // --- TÍTULO PRINCIPAL ---
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("CERTIFICADO DE EMPRESA", 105, y, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.text("CERTIFICADO DE EMPRESA", 105, 10, { align: "center" });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("SEPE / Ministerio de Trabajo y Economía Social", 105, 14, { align: "center" });
 
-    y += 10;
+    // --- ESTRUCTURA DE CABECERA (RECUADRO) ---
+    doc.setLineWidth(0.2);
+    doc.rect(MARGIN, headerStartY, 185, boxHeight);
+    doc.line(separatorX, headerStartY, separatorX, headerStartY + boxHeight);
+
+    // --- DATOS EMPRESA (Columna Izquierda) ---
+    drawHeaderLine("Empresa:", empresa.nombre, col1X, y);
+    drawHeaderLine("Domicilio:", empresa.domicilio, col1X, y + lineHeight);
+    drawHeaderLine("CIF:", empresa.cif, col1X, y + (lineHeight * 2));
+
+    doc.setFontSize(labelSize);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Código de Cuenta de Cotización a la S.S.:", col1X, y + (lineHeight * 3));
+    doc.setFontSize(valueSize);
+    doc.setFont("courier", "bold");
+    doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
+    doc.text(empresa.ccc || '', col1X + 5, y + (lineHeight * 4));
+
+    // --- DATOS TRABAJADOR (Columna Derecha) ---
+    drawHeaderLine("Trabajador:", empleado.nombre, col2X, y);
+    drawHeaderLine("NIF:", empleado.dni, col2X, y + lineHeight);
+    drawHeaderLine("Nº Afiliación S.S.:", empleado.ss, col2X, y + (lineHeight * 2));
+
+    // --- SECCIÓN: CAUSA DE EXTINCIÓN ---
+    y = headerStartY + boxHeight + 10;
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("MINISTERIO DE TRABAJO Y ECONOMÍA SOCIAL - SERVICIO PÚBLICO DE EMPLEO ESTATAL", 105, y, { align: "center" });
-
-    y += 15;
-    // --- DATOS DE LA EMPRESA ---
     doc.setFont("helvetica", "bold");
-    doc.text("DATOS DE LA EMPRESA", MARGIN, y);
-    y += 5;
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, y, 210 - MARGIN, y);
-    y += 7;
+    doc.setTextColor(0, 0, 0);
+    doc.text("DATOS DE LA EXTINCIÓN DE LA RELACIÓN LABORAL", MARGIN, y);
+    y += 2;
+    doc.line(MARGIN, y, 200, y);
+    y += 6;
 
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Nombre/Razón Social: ${empresa.nombre || ''}`, MARGIN, y);
-    y += 5;
-    doc.text(`CIF/NIF: ${empresa.cif || ''}`, MARGIN, y);
-    doc.text(`C.C.C.: ${empresa.ccc || ''}`, 100, y);
-    y += 5;
-    doc.text(`Domicilio: ${empresa.domicilio || ''}`, MARGIN, y);
-
-    y += 15;
-    // --- DATOS DEL TRABAJADOR ---
+    doc.text(`Causa de extinción:`, MARGIN, y);
     doc.setFont("helvetica", "bold");
-    doc.text("DATOS DEL TRABAJADOR", MARGIN, y);
-    y += 5;
-    doc.line(MARGIN, y, 210 - MARGIN, y);
-    y += 7;
+    doc.text(causa, MARGIN + 35, y);
 
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nombre y Apellidos: ${empleado.nombre || ''}`, MARGIN, y);
-    y += 5;
-    doc.text(`NIF/NIE: ${empleado.dni || ''}`, MARGIN, y);
-    doc.text(`Nº Afiliación S.S.: ${empleado.ss || ''}`, 100, y);
-
-    y += 15;
-    // --- CAUSA DE LA BAJA ---
-    doc.setFont("helvetica", "bold");
-    doc.text("DETALLES DE LA EXTINCIÓN", MARGIN, y);
-    y += 5;
-    doc.line(MARGIN, y, 210 - MARGIN, y);
-    y += 7;
-
-    doc.setFont("helvetica", "normal");
-    doc.text(`Causa de extinción: ${causa}`, MARGIN, y);
     y += 5;
     const fechaBajaFormat = new Date(fechaBaja).toLocaleDateString('es-ES');
-    doc.text(`Fecha de baja definitiva: ${fechaBajaFormat}`, MARGIN, y);
-
-    y += 15;
-    // --- TABLA DE COTIZACIONES ---
+    doc.setFont("helvetica", "normal");
+    doc.text(`Fecha de baja definitiva:`, MARGIN, y);
     doc.setFont("helvetica", "bold");
-    doc.text("COTIZACIONES DE LOS ÚLTIMOS 180 DÍAS (o últimos periodos)", MARGIN, y);
-    y += 5;
+    doc.text(fechaBajaFormat, MARGIN + 40, y);
 
-    // Preparar datos para la tabla
+    // --- SECCIÓN: COTIZACIONES ---
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.text("COTIZACIONES DE LOS ÚLTIMOS 180 DÍAS (Periodos reportados)", MARGIN, y);
+
     const body = cotizaciones.map(c => [
         c.anio,
         c.mes,
@@ -82,42 +109,49 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     const totalBases = cotizaciones.reduce((acc, c) => acc + parseFloat(c.base_cp || 0), 0);
 
     doc.autoTable({
-        startY: y,
+        startY: y + 2,
         margin: { left: MARGIN, right: MARGIN },
+        theme: 'grid', // Estilo grid simple
+        headStyles: { fillGray: true, textColor: 0, fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        footStyles: { fillGray: true, textColor: 0, fontStyle: 'bold', fontSize: 8 },
         head: [['Año', 'Mes', 'Días Cotizados', 'Base Contingencias Prof. (Desempleo)']],
         body: body,
         foot: [[
-            'TOTAL',
+            'TOTALES',
             '',
             totalDias.toFixed(2),
             totalBases.toFixed(2) + " €"
-        ]],
-        theme: 'grid',
-        headStyles: { fillGray: true, textColor: 0, fontStyle: 'bold' },
-        footStyles: { fillGray: true, textColor: 0, fontStyle: 'bold' }
+        ]]
     });
 
-    y = doc.lastAutoTable.finalY + 20;
-
-    // --- FIRMA Y SELLO ---
+    // --- PIE DE PÁGINA (FIRMA Y SELLO) ---
+    y = doc.lastAutoTable.finalY + 15;
     const hoy = new Date();
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
     doc.text(`En EL PTO STA MARIA, a ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`, MARGIN, y);
 
     y += 10;
     doc.text("Firma y sello de la empresa", MARGIN, y);
 
-    // Añadir sello si existe
-    if (typeof firmaBase64 !== 'undefined') {
+    // --- INSERCIÓN DEL SELLO DESDE LOCALSTORAGE ---
+    let logoBase64 = localStorage.getItem('empresaLogo');
+    if (logoBase64 && logoBase64.trim() !== "") {
         try {
-            // Ajustamos posición para que quede encima del texto
-            doc.addImage(firmaBase64, 'PNG', MARGIN, y - 15, 35, 30);
+            // Limpiar por si acaso tiene espacios o caracteres extras
+            logoBase64 = logoBase64.trim();
+            // Si no tiene el prefijo data:image, se lo añadimos (aunque suele tenerlo)
+            if (!logoBase64.startsWith('data:image')) {
+                logoBase64 = 'data:image/png;base64,' + logoBase64;
+            }
+            doc.addImage(logoBase64, 'PNG', MARGIN, y - 18, 40, 35);
         } catch (e) {
-            console.error("No se pudo añadir la firma al certificado:", e);
+            console.error("Error al añadir el sello al PDF:", e);
         }
     }
 
-    // Guardar
-    const nombreArchivo = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
-    doc.save(nombreArchivo);
+    const fileName = `Certificado_Empresa_${empleado.nombre.replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
 }
