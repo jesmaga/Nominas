@@ -157,6 +157,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="sello.js"></script>
     <script src="pdfGenerator.js" defer></script>
+    <script src="certificadoGenerator.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body class="flex h-screen">
@@ -1660,8 +1662,9 @@
                 <td>${puesto.nombre}</td>
                 <td>${empleado.tipoContrato || 'N/A'}<td>${empleado.dni}</td>
                 <td class="flex space-x-2">
-                    <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')"><i data-lucide="edit" class="w-5 h-5"></i></button>
-                    <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')" title="Editar"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                    <button class="p-2 text-green-500 hover:text-green-300" onclick="app.generarCertificado('${empleado.id}')" title="Certificado Empresa"><i data-lucide="file-text" class="w-5 h-5"></i></button>
+                    <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')" title="Borrar"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                 </td>
             `;
                     listaEmpleados.appendChild(tr);
@@ -2538,6 +2541,67 @@
                     info: infoFam + " " + infoExtra
                 };
             };
+
+            // --- LÓGICA CERTIFICADO DE EMPRESA ---
+            app.generarCertificado = async (empleadoId) => {
+                const empleado = empleados.find(e => e.id === empleadoId);
+                const puesto = puestos.find(p => p.id === empleado.puestoId);
+
+                if (!empleado || !puesto) {
+                    Swal.fire('Error', 'No se encontró la información del empleado o su puesto.', 'error');
+                    return;
+                }
+
+                const { value: formValues } = await Swal.fire({
+                    title: 'Generar Certificado de Empresa',
+                    html:
+                        '<div class="text-left">' +
+                        '<label class="block text-sm font-medium text-gray-700 font-bold mb-1">Causa de Extinción</label>' +
+                        '<select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-4" style="display: flex; margin: 0 auto 1.25em;">' +
+                        '<option value="Fin de contrato">Fin de contrato</option>' +
+                        '<option value="Despido">Despido</option>' +
+                        '<option value="Baja voluntaria">Baja voluntaria</option>' +
+                        '</select>' +
+                        '<label class="block text-sm font-medium text-gray-700 font-bold mb-1">Fecha de Baja</label>' +
+                        '<input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" style="margin: 0 auto;" value="' + formatDateToYMD(new Date()) + '">' +
+                        '</div>',
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Generar PDF',
+                    cancelButtonText: 'Cancelar',
+                    preConfirm: () => {
+                        return {
+                            causa: document.getElementById('swal-causa').value,
+                            fechaBaja: document.getElementById('swal-fecha').value
+                        }
+                    }
+                });
+
+                if (formValues) {
+                    try {
+                        Swal.fire({
+                            title: 'Obteniendo cotizaciones...',
+                            didOpen: () => { Swal.showLoading(); }
+                        });
+
+                        const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
+                        if (!res.ok) throw new Error("Fallo al obtener cotizaciones");
+                        const cotizaciones = await res.json();
+
+                        // Generar el PDF usando la nueva función del generador
+                        if (typeof generarCertificadoEmpresa === 'function') {
+                            generarCertificadoEmpresa(empresa, empleado, cotizaciones, formValues.causa, formValues.fechaBaja);
+                            Swal.close();
+                        } else {
+                            throw new Error("La función de generación de certificado no está cargada.");
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        Swal.fire('Error', 'Hubo un error al generar el certificado: ' + err.message, 'error');
+                    }
+                }
+            };
+
 
             const otrosDevengosContainer = document.getElementById('otros-devengos-container');
             const addDevengoBtn = document.getElementById('add-devengo-btn');
@@ -3734,6 +3798,11 @@
                     ultimaNominaCalculada.mes = fechaObj.getMonth() + 1;
                     ultimaNominaCalculada.anio = fechaObj.getFullYear();
 
+                    // Si por alguna razón viene vacío, usamos diasCalculoTotal
+                    if (!ultimaNominaCalculada.nomina.diasCotizados) {
+                        ultimaNominaCalculada.nomina.diasCotizados = ultimaNominaCalculada.nomina.diasCalculoTotal;
+                    }
+
                     const originalText = btnGuardarIndividualBd.innerHTML;
                     btnGuardarIndividualBd.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando...';
                     btnGuardarIndividualBd.disabled = true;
@@ -3799,6 +3868,10 @@
 
                         const mesCalculado = fechaObj.getMonth() + 1;
                         const anioCalculado = fechaObj.getFullYear();
+
+                        if (!item.nomina.diasCotizados) {
+                            item.nomina.diasCotizados = item.nomina.diasCalculoTotal;
+                        }
 
                         // UI Feedback
                         btnGuardarLoteBd.innerHTML = `<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Guardando ${i + 1}/${ultimoCalculo.length}...`;

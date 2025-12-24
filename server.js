@@ -27,7 +27,7 @@ const initDB = async () => {
 
         // 1. Tabla Nóminas (REFACTORIZADA)
         // Borramos tabla antigua para migración (Según requerimiento)
-        await client.query('DROP TABLE IF EXISTS nominas');
+        // await client.query('DROP TABLE IF EXISTS nominas');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS nominas (
@@ -384,6 +384,25 @@ app.get('/api/historial', async (req, res) => {
 // Redirige cualquier ruta no conocida al login.
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// --- ENDPOINT: Obtener las últimas 6 cotizaciones para Certificado de Empresa ---
+app.get('/api/nominas/ultimas-cotizaciones/:empleadoId', async (req, res) => {
+    const { empleadoId } = req.params;
+    try {
+        const query = `
+            SELECT anio, mes, dias_cotizados, base_cp
+            FROM nominas
+            WHERE empleado_id = $1
+            ORDER BY anio DESC, mes DESC
+            LIMIT 6
+        `;
+        const result = await pool.query(query, [empleadoId]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error al obtener últimas cotizaciones:", err);
+        res.status(500).json({ error: "Error al obtener cotizaciones del servidor" });
+    }
 });
 
 // Arrancar servidor
