@@ -1,12 +1,13 @@
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configuración de la conexión a Neon (PostgreSQL)
+// Configuración de la conexión a NEON
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -14,123 +15,332 @@ const pool = new Pool({
     }
 });
 
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Inicializar Base de Datos
+// --- 1. INICIALIZAR BASE DE DATOS (Creación de Tablas) ---
 const initDB = async () => {
-    const client = await pool.connect();
     try {
-        // 1. Tabla Empleados
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS empleados (
-                id SERIAL PRIMARY KEY,
-                nombre VARCHAR(100) NOT NULL,
-                puesto VARCHAR(100),
-                salario_base NUMERIC(10, 2) NOT NULL,
-                pagas INTEGER DEFAULT 14,
-                irpf NUMERIC(5, 2) DEFAULT 0,
-                hijos INTEGER DEFAULT 0,
-                discapacidad NUMERIC(5, 2) DEFAULT 0,
-                ascendientes INTEGER DEFAULT 0,
-                tipo_contrato VARCHAR(50),
-                dni VARCHAR(20),
-                nss VARCHAR(20),
-                antiguedad DATE
-            );
-        `);
+        const client = await pool.connect();
 
-        // 2. Tabla Nóminas
-        // NOTA: La línea DROP TABLE está comentada para evitar borrar datos al reiniciar
+        // 1. Tabla Nóminas (REFACTORIZADA)
+        // Borramos tabla antigua para migración (Según requerimiento)
         // await client.query('DROP TABLE IF EXISTS nominas');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS nominas (
                 id SERIAL PRIMARY KEY,
-                empleado_id INTEGER REFERENCES empleados(id) ON DELETE CASCADE,
-                anio INTEGER NOT NULL,
-                mes INTEGER NOT NULL,
-                dias_cotizados NUMERIC(5, 2) DEFAULT 30,
-                base_cc NUMERIC(10, 2),
-                base_cp NUMERIC(10, 2),
-                base_irpf NUMERIC(10, 2),
-                cuota_irpf NUMERIC(10, 2),
-                total_devengado NUMERIC(10, 2),
-                liquido_percibir NUMERIC(10, 2),
+                empleado_id TEXT,
+                anio INTEGER,
+                mes INTEGER,
+                dias_cotizados NUMERIC(10,2),
+                base_cc NUMERIC(10,2),
+                base_cp NUMERIC(10,2),
+                base_irpf NUMERIC(10,2),
+                cuota_irpf NUMERIC(10,2),
+                total_devengado NUMERIC(10,2),
+                liquido_percibir NUMERIC(10,2),
                 datos_completo JSONB,
                 fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+            )
         `);
 
-        console.log('Tablas verificadas/creadas correctamente');
-    } catch (err) {
-        console.error('Error inicializando DB:', err);
-    } finally {
+        // 2. Tabla Puestos (Guardamos objeto JSON)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS puestos (
+                id TEXT PRIMARY KEY,
+                datos JSONB
+            )
+        `);
+
+        // 3. Tabla Empleados (Guardamos objeto JSON)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS empleados (
+                id TEXT PRIMARY KEY,
+                datos JSONB
+            )
+        `);
+
+        // 4. Tabla Usuarios
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS usuarios (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT
+            )
+        `);
+
+        // 5. Tabla Configuraciones (SS, Empresa, Conceptos, Contratos)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS configuraciones (
+                id TEXT PRIMARY KEY,
+                datos JSONB
+            )
+        `);
+
+        // --- CREAR ADMIN POR DEFECTO SI NO EXISTE ---
+        // Hash MD5 de 'password123': 482c811da5d5b4bc6d497ffa98491e38
+        const userCheck = await client.query("SELECT * FROM usuarios WHERE username = 'admin'");
+        if (userCheck.rows.length === 0) {
+            await client.query("INSERT INTO usuarios (username, password_hash) VALUES ($1, $2)", ['admin', '482c811da5d5b4bc6d497ffa98491e38']);
+            console.log("--> Usuario 'admin' creado por defecto.");
+        }
+
+        console.log("--> Base de datos Neon conectada y tablas verificadas.");
         client.release();
+    } catch (err) {
+        console.error("Error inicializando DB:", err);
     }
 };
 
+// Ejecutamos la inicialización al arrancar
 initDB();
 
-// --- RUTAS DE LA API ---
 
-// 1. Obtener empleados
+// --- 2. API ENDPOINTS (RUTAS) ---
+
+// --- LOGIN ---
+app.post('/api/login', async (req, res) => {
+    const { username, passwordHash } = req.body;
+    try {
+        const result = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
+        const user = result.rows[0];
+
+        if (user && user.password_hash === passwordHash) {
+            res.json({ success: true, user: user.username });
+        } else {
+            res.status(401).json({ success: false, error: "Credenciales incorrectas" });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- GESTIÓN DE USUARIOS ---
+app.get('/api/usuarios', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT username FROM usuarios");
+        res.json(result.rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/usuarios', async (req, res) => {
+    const { username, passwordHash } = req.body;
+    try {
+        await pool.query("INSERT INTO usuarios (username, password_hash) VALUES ($1, $2)", [username, passwordHash]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/usuarios/:username', async (req, res) => {
+    try {
+        if (req.params.username === 'admin') {
+            return res.status(403).json({ error: "No se puede borrar al usuario admin" });
+        }
+        await pool.query("DELETE FROM usuarios WHERE username = $1", [req.params.username]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- PUESTOS ---
+app.get('/api/puestos', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT datos FROM puestos");
+        const puestos = result.rows.map(row => row.datos);
+        res.json(puestos);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/puestos', async (req, res) => {
+    const puesto = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO puestos (id, datos) VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE SET datos = $2
+        `, [puesto.id, JSON.stringify(puesto)]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/puestos/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM puestos WHERE id = $1", [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- EMPLEADOS ---
 app.get('/api/empleados', async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM empleados ORDER BY id ASC');
+        const result = await pool.query("SELECT datos FROM empleados");
+        const empleados = result.rows.map(row => row.datos);
+        res.json(empleados);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/empleados', async (req, res) => {
+    const empleado = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO empleados (id, datos) VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE SET datos = $2
+        `, [empleado.id, JSON.stringify(empleado)]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/empleados/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM empleados WHERE id = $1", [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- CONFIGURACIONES (SS, Empresa, Conceptos, Contratos) ---
+app.get('/api/config/:id', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT datos FROM configuraciones WHERE id = $1", [req.params.id]);
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].datos);
+        } else {
+            res.json(null);
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/config/:id', async (req, res) => {
+    try {
+        await pool.query(`
+            INSERT INTO configuraciones (id, datos) VALUES ($1, $2)
+            ON CONFLICT (id) DO UPDATE SET datos = $2
+        `, [req.params.id, JSON.stringify(req.body)]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- NÓMINAS ---
+
+// Obtener historial de nóminas
+app.get('/api/nominas', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                n.id, 
+                n.anio, 
+                n.mes, 
+                n.total_devengado, 
+                n.liquido_percibir, 
+                n.fecha_creacion,
+                n.datos_completo,  -- <--- ¡ESTA ES LA LÍNEA QUE FALTABA!
+                e.nombre as empleado_nombre, 
+                e.puesto,
+                e.dni,
+                e.nss,
+                e.antiguedad
+            FROM nominas n
+            JOIN empleados e ON n.empleado_id = e.id
+            ORDER BY n.anio DESC, n.mes DESC, n.id DESC
+        `;
+
+        const { rows } = await pool.query(query);
         res.json(rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error(err);
+        res.status(500).json({ error: "Error al obtener historial" });
     }
 });
 
-// 2. Crear empleado
-app.post('/api/empleados', async (req, res) => {
-    const { nombre, puesto, salario, pagas, irpf, hijos, discapacidad, ascendientes, tipoContrato, dni, nss, antiguedad } = req.body;
+app.get('/api/nominas/base-anterior', async (req, res) => {
     try {
-        const { rows } = await pool.query(
-            'INSERT INTO empleados (nombre, puesto, salario_base, pagas, irpf, hijos, discapacidad, ascendientes, tipo_contrato, dni, nss, antiguedad) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-            [nombre, puesto, salario, pagas, irpf, hijos, discapacidad, ascendientes, tipoContrato, dni, nss, antiguedad]
-        );
-        res.json(rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { empleadoId, fechaBaja } = req.query;
+
+        if (!empleadoId || !fechaBaja) {
+            return res.status(400).json({ error: 'Faltan parámetros: empleadoId, fechaBaja' });
+        }
+
+        // Parsear fecha baja (YYYY-MM-DD)
+        const dateBaja = new Date(fechaBaja);
+        // Queremos el mes anterior
+        // Restamos un mes a la fecha dada
+        dateBaja.setMonth(dateBaja.getMonth() - 1);
+
+        const targetAnio = dateBaja.getFullYear();
+        // getMonth() devuelve 0-11, sumamos 1 para guardar como 1-12
+        const targetMes = dateBaja.getMonth() + 1;
+
+        // Buscar en BD
+        const query = `
+            SELECT base_cc 
+            FROM nominas 
+            WHERE empleado_id = $1 AND anio = $2 AND mes = $3
+            LIMIT 1
+        `;
+
+        const result = await pool.query(query, [empleadoId, targetAnio, targetMes]);
+
+        if (result.rows.length > 0) {
+            res.json({ base: parseFloat(result.rows[0].base_cc) });
+        } else {
+            res.json({ base: null });
+        }
+
+    } catch (e) {
+        console.error("Error buscando base anterior:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
-// 3. Actualizar empleado
-app.put('/api/empleados/:id', async (req, res) => {
-    const { id } = req.params;
-    const { nombre, puesto, salario, pagas, irpf, hijos, discapacidad, ascendientes, tipoContrato, dni, nss, antiguedad } = req.body;
+app.get('/api/nominas/acumulado', async (req, res) => {
     try {
-        await pool.query(
-            'UPDATE empleados SET nombre=$1, puesto=$2, salario_base=$3, pagas=$4, irpf=$5, hijos=$6, discapacidad=$7, ascendientes=$8, tipo_contrato=$9, dni=$10, nss=$11, antiguedad=$12 WHERE id=$13',
-            [nombre, puesto, salario, pagas, irpf, hijos, discapacidad, ascendientes, tipoContrato, dni, nss, antiguedad, id]
-        );
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const { empleadoId, anio, mes } = req.query;
+
+        if (!empleadoId || !anio) {
+            return res.status(400).json({ error: 'Faltan parámetros: empleadoId, anio' });
+        }
+
+        // Si se paso mes, exlcuimos ese mes en adelante (para no sumar el mes que estamos calculando actualmente si ya existiera borrador)
+        // O simplemente sumamos todo lo ANTERIOR a ese mes.
+        // La consulta sumara todo lo del año dado para ese empleado
+        // Opcional: AND mes < $3
+
+        let query = `
+            SELECT 
+                COALESCE(SUM(total_devengado), 0) as total_ingresos,
+                COALESCE(SUM(cuota_irpf), 0) as total_retenido
+            FROM nominas
+            WHERE empleado_id = $1 AND anio = $2
+        `;
+
+        const params = [empleadoId, parseInt(anio)];
+
+        if (mes) {
+            query += ` AND mes < $3`;
+            params.push(parseInt(mes));
+        }
+
+        const result = await pool.query(query, params);
+
+        const acumulado = result.rows[0] || { total_ingresos: 0, total_retenido: 0 };
+
+        // Convert to numbers just in case
+        res.json({
+            totalIngresos: parseFloat(acumulado.total_ingresos),
+            totalRetenido: parseFloat(acumulado.total_retenido)
+        });
+
+    } catch (e) {
+        console.error("Error obteniendo acumulados:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
-// 4. Borrar empleado
-app.delete('/api/empleados/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await pool.query('DELETE FROM empleados WHERE id=$1', [id]);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// 5. Guardar Nómina
 app.post('/api/guardar', async (req, res) => {
-    const { empleado, periodo, nomina, mes, anio } = req.body;
+    // 1. Extraemos también 'mes' y 'anio' y el nuevo flag 'overwrite'
+    const { empleado, periodo, nomina, mes, anio, overwrite } = req.body;
 
     try {
-        // Lógica para asegurar que mes y año son números válidos
+        // 2. Lógica de Fallback de seguridad:
         let anioFinal = parseInt(anio);
         let mesFinal = parseInt(mes);
 
@@ -147,14 +357,31 @@ app.post('/api/guardar', async (req, res) => {
 
         if (isNaN(anioFinal) || isNaN(mesFinal)) {
             console.error("Error backend: Mes o Año son NaN", req.body);
-            return res.status(400).json({ error: "No se pudo determinar el Mes o Año. Verifique fechas." });
+            return res.status(400).json({ error: "No se pudo determinar el Mes o Año de la nómina. Verifique las fechas." });
+        }
+
+        // --- PREVENCIÓN DE DUPLICADOS ---
+        const checkQuery = `SELECT id FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3`;
+        const checkResult = await pool.query(checkQuery, [empleado.id, anioFinal, mesFinal]);
+
+        if (checkResult.rows.length > 0) {
+            if (!overwrite) {
+                return res.json({
+                    success: false,
+                    exists: true,
+                    message: `Ya existe una nómina para ${empleado.nombre} en ${mesFinal}/${anioFinal}. ¿Deseas sobreescribirla?`
+                });
+            } else {
+                // Si overwrite es true, borramos el registro anterior antes de insertar el nuevo
+                await pool.query(`DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3`, [empleado.id, anioFinal, mesFinal]);
+            }
         }
 
         const values = [
             empleado.id,
             anioFinal,
             mesFinal,
-            parseFloat(nomina.diasCotizados || 30),
+            parseFloat(nomina.diasCotizados || 0),
             parseFloat(nomina.baseContingenciasComunes || 0),
             parseFloat(nomina.baseContingenciasProfesionales || 0),
             parseFloat(nomina.baseIRPF || 0),
@@ -180,70 +407,56 @@ app.post('/api/guardar', async (req, res) => {
     }
 });
 
-// 6. Obtener Historial de Nóminas (CORREGIDO)
-app.get('/api/nominas', async (req, res) => {
+// --- ENDPOINT: Borrar nómina por ID ---
+app.delete('/api/nominas/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-        // AQUÍ ESTABA EL ERROR: Faltaba seleccionar 'datos_completo'
-        const query = `
-            SELECT 
-                n.id, 
-                n.anio, 
-                n.mes, 
-                n.total_devengado, 
-                n.liquido_percibir, 
-                n.fecha_creacion,
-                n.datos_completo,  
-                n.dias_cotizados,
-                n.base_cp,
-                e.nombre as empleado_nombre, 
-                e.puesto,
-                e.dni,
-                e.nss,
-                e.antiguedad
-            FROM nominas n
-            JOIN empleados e ON n.empleado_id = e.id
-            ORDER BY n.anio DESC, n.mes DESC, n.id DESC
-        `;
-
-        const { rows } = await pool.query(query);
-        res.json(rows);
+        await pool.query('DELETE FROM nominas WHERE id = $1', [id]);
+        res.json({ success: true });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al obtener historial" });
+        console.error("Error al borrar nómina:", err);
+        res.status(500).json({ error: "Error al borrar la nómina del servidor" });
     }
 });
 
-// 7. Obtener últimas cotizaciones (Para Certificado Empresa)
+
+app.get('/api/historial', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM nominas ORDER BY fecha_creacion DESC LIMIT 50');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// --- RUTA COMODÍN (Catch-all) ---
+// Usamos RegExp para compatibilidad con Express 5.
+// Redirige cualquier ruta no conocida al login.
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// --- ENDPOINT: Obtener las últimas 6 cotizaciones para Certificado de Empresa ---
 app.get('/api/nominas/ultimas-cotizaciones/:empleadoId', async (req, res) => {
     const { empleadoId } = req.params;
     try {
         const query = `
-            SELECT 
-                anio, mes, dias_cotizados, base_cp 
-            FROM nominas 
-            WHERE empleado_id = $1 
-            ORDER BY anio DESC, mes DESC 
+            SELECT anio, mes, dias_cotizados, base_cp
+            FROM nominas
+            WHERE empleado_id = $1
+            ORDER BY anio DESC, mes DESC
             LIMIT 6
         `;
-        const { rows } = await pool.query(query, [empleadoId]);
-        res.json(rows);
+        const result = await pool.query(query, [empleadoId]);
+        res.json(result.rows);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al obtener cotizaciones" });
+        console.error("Error al obtener últimas cotizaciones:", err);
+        res.status(500).json({ error: "Error al obtener cotizaciones del servidor" });
     }
 });
 
-// 8. Borrar Nómina (Historial)
-app.delete('/api/nominas/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await pool.query('DELETE FROM nominas WHERE id=$1', [id]);
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
+// Arrancar servidor
 app.listen(port, () => {
-    console.log(`Servidor corriendo en puerto ${port}`);
+    console.log(`Servidor escuchando en puerto ${port}`);
 });
