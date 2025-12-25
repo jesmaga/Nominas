@@ -1374,6 +1374,10 @@
                     renderConceptoDropdowns();
                     // Opcional: Limpiar resultados de lote si estaban visibles
                     nominaLoteResultadoContainer?.classList.add('hidden');
+                } else if (targetId === 'nominas-lote') {
+                    renderEmployeeSelectionListLote(); // Refrescar lista empleados
+                    if (typeof setDefaultNominaDatesLote === 'function') setDefaultNominaDatesLote(); // Fechas por defecto
+                    renderConceptoDropdownsLote();     // <--- ESTO ES LO QUE FALTABA
                 } else if (targetId === 'historial-page') {
                     renderHistorial();
                 }
@@ -3420,41 +3424,17 @@
 
                             const data = JSON.parse(rawData);
 
-                            // Reusamos la vista de "Generar Nómina"
-                            // 1. Navegamos a la pestaña
-                            showPage('nominas');
+                            if (typeof showNominaDetailInModal === 'function') {
+                                showNominaDetailInModal(data.nomina, data.empleado);
 
-                            // 2. Establecemos variable global
-                            ultimaNominaCalculada = {
-                                nomina: data.nomina,
-                                empleado: data.empleado,
-                                periodo: data.periodo,
-                                esHistorial: true // Flag importante
-                            };
-
-                            // 3. Renderizamos el resultado
-                            displayNominaResult(data.nomina, data.empleado);
-
-                            // 4. Inyectamos indicador visual de MODO HISTÓRICO
-                            const container = document.getElementById('nomina-resultado');
-                            if (container) {
-                                const banner = document.createElement('div');
-                                banner.className = 'bg-yellow-900 border-l-4 border-yellow-500 text-yellow-100 p-4 mb-4 rounded';
-                                banner.innerHTML = `
-                                    <div class="flex items-center">
-                                        <i data-lucide="archive" class="w-6 h-6 mr-3"></i>
-                                        <div>
-                                            <p class="font-bold">Vista de Historial</p>
-                                            <p class="text-sm">Estás viendo una copia guardada. No es un cálculo en tiempo real.</p>
-                                        </div>
-                                    </div>
-                                `;
-                                container.prepend(banner);
-                                lucide.createIcons();
+                                // Opcional: Actualizar el título del modal para que sea más claro
+                                const modalTitle = document.getElementById('nomina-detail-modal-title');
+                                if (modalTitle) {
+                                    modalTitle.textContent = `Histórico: ${data.empleado.nombre} (${data.periodo ? data.periodo.inicio : ''})`;
+                                }
+                            } else {
+                                console.error("La función showNominaDetailInModal no está definida");
                             }
-
-                            // 5. Ocultamos botón de guardar BD (ya está guardada)
-                            if (btnGuardarIndividualBd) btnGuardarIndividualBd.style.display = 'none';
 
                         } catch (err) {
                             console.error(err);
