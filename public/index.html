@@ -1000,28 +1000,78 @@
         <div id="historial-page" class="page-content">
             <h2 class="text-3xl font-bold text-white mb-6">Historial de Nóminas</h2>
             <div class="content-card">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                     <h3 class="text-xl font-semibold text-white">Registros Guardados</h3>
-                    <button id="btn-refresh-historial" class="btn btn-secondary text-xs">
-                        <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Actualizar
-                    </button>
+
+                    <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                            <input type="text" id="historial-search" placeholder="Buscar empleado, año..."
+                                class="form-input pl-9 p-2 text-sm w-full md:w-64">
+                        </div>
+
+                        <select id="historial-rows-per-page" class="form-input p-2 text-sm w-20">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+
+                        <button id="btn-refresh-historial" class="btn btn-secondary text-xs whitespace-nowrap">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Actualizar
+                        </button>
+                    </div>
                 </div>
+
                 <div class="overflow-x-auto">
                     <table id="tabla-historial" class="w-full data-table">
                         <thead>
-                            <tr>
-                                <th>Fecha Emisión</th>
-                                <th>Empleado</th>
-                                <th>Periodo</th>
-                                <th>Total Devengado</th>
-                                <th>Líquido</th>
+                            <tr class="text-gray-400 select-none">
+                                <th class="cursor-pointer hover:text-white transition-colors sort-header"
+                                    data-key="fecha_creacion">
+                                    <div class="flex items-center">Fecha <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th class="cursor-pointer hover:text-white transition-colors sort-header"
+                                    data-key="empleado_nombre">
+                                    <div class="flex items-center">Empleado <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th class="cursor-pointer hover:text-white transition-colors sort-header"
+                                    data-key="periodo">
+                                    <div class="flex items-center">Periodo <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th class="cursor-pointer hover:text-white transition-colors sort-header"
+                                    data-key="total_devengado">
+                                    <div class="flex items-center">Devengado <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th class="cursor-pointer hover:text-white transition-colors sort-header"
+                                    data-key="liquido_percibir">
+                                    <div class="flex items-center">Líquido <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-historial-body">
-                            <!-- JS injected -->
                         </tbody>
                     </table>
+                </div>
+
+                <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
+                    <span class="text-sm text-gray-400" id="historial-pagination-info">Mostrando 0 de 0</span>
+                    <div class="flex space-x-2">
+                        <button id="btn-prev-page"
+                            class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </button>
+                        <button id="btn-next-page"
+                            class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2549,126 +2599,128 @@
                 };
             };
 
-            // --- LÓGICA CERTIFICADO DE EMPRESA ---
-            // --- LÓGICA CERTIFICADO DE EMPRESA (CON OPCIÓN MANUAL) ---
+            // --- LÓGICA CERTIFICADO DE EMPRESA (CORREGIDA Y AUTÓNOMA) ---
             app.generarCertificado = async (empleadoId) => {
-
-                // 1. BLOQUE DE SEGURIDAD (Validar Empresa)
-                if (!empresa || !empresa.nombre) {
-                    try {
-                        const res = await fetch('/api/config/empresa');
-                        const data = await res.json();
-                        if (data) empresa = data;
-                    } catch (e) { }
-
+                try {
+                    // 1. Validar Empresa
                     if (!empresa || !empresa.nombre) {
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Datos de Empresa faltantes',
-                            text: 'Por favor, ve a la pestaña "Admin > Datos de Empresa" y guarda la configuración antes de generar el certificado.'
-                        });
+                        try {
+                            const res = await fetch('/api/config/empresa');
+                            const data = await res.json();
+                            if (data) empresa = data;
+                        } catch (e) { console.error(e); }
+
+                        if (!empresa || !empresa.nombre) {
+                            Swal.fire('Faltan Datos', 'Guarda los datos de la empresa en la pestaña Admin.', 'warning');
+                            return;
+                        }
+                    }
+
+                    // 2. Buscar Empleado
+                    const empleado = empleados.find(e => e.id === empleadoId);
+                    if (!empleado) {
+                        Swal.fire('Error', 'No se encontró al empleado.', 'error');
                         return;
                     }
-                }
 
-                const empleado = empleados.find(e => e.id === empleadoId);
-                const puesto = puestos.find(p => p.id === empleado.puestoId);
+                    // 3. Calcular fecha de hoy para el input (YYYY-MM-DD) de forma directa
+                    const hoy = new Date().toISOString().split('T')[0];
 
-                if (!empleado) {
-                    Swal.fire('Error', 'No se encontró la información del empleado.', 'error');
-                    return;
-                }
+                    // 4. Mostrar Modal
+                    const { value: formValues } = await Swal.fire({
+                        title: 'Certificado de Empresa',
+                        html: `
+                            <div class="text-left">
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Causa de Extinción</label>
+                                <select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-2">
+                                    <option value="Fin de contrato">Fin de contrato</option>
+                                    <option value="Despido">Despido</option>
+                                    <option value="Baja voluntaria">Baja voluntaria</option>
+                                    <option value="No superar periodo de prueba">No superar periodo de prueba</option>
+                                    <option value="_otro_">Otro (Especificar)...</option>
+                                </select>
 
-                // 2. MODAL CON LÓGICA DE CAMPO MANUAL
-                const { value: formValues } = await Swal.fire({
-                    title: 'Generar Certificado de Empresa',
-                    html: `
-                        <div class="text-left">
-                            <label class="block text-sm font-medium text-gray-700 font-bold mb-1">Causa de Extinción</label>
-                            
-                            <select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-2" style="display: flex; margin: 0 auto 0.5em;">
-                                <option value="Fin de contrato">Fin de contrato</option>
-                                <option value="Despido">Despido</option>
-                                <option value="Baja voluntaria">Baja voluntaria</option>
-                                <option value="No superar periodo de prueba">No superar periodo de prueba</option>
-                                <option value="_otro_">Otro (Especificar manualmente)...</option>
-                            </select>
+                                <input id="swal-causa-manual" type="text" placeholder="Escribe el motivo..." 
+                                    class="swal2-input w-full border rounded p-2 mb-4" 
+                                    style="display: none; margin: 0 auto 1em;">
 
-                            <input id="swal-causa-manual" type="text" placeholder="Escribe el motivo aquí..." 
-                                   class="swal2-input w-full border rounded p-2 mb-4 hidden" 
-                                   style="margin: 0 auto 1.25em; display: none;">
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Fecha de Baja Efectiva</label>
+                                <input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" 
+                                    style="margin: 0 auto;" value="${hoy}">
+                            </div>
+                        `,
+                        focusConfirm: false,
+                        showCancelButton: true,
+                        confirmButtonText: 'Generar PDF',
+                        cancelButtonText: 'Cancelar',
 
-                            <label class="block text-sm font-medium text-gray-700 font-bold mb-1">Fecha de Baja</label>
-                            <input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" 
-                                   style="margin: 0 auto;" value="${formatDateToYMD(new Date())}">
-                        </div>
-                    `,
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Generar PDF',
-                    cancelButtonText: 'Cancelar',
-                    // Lógica para mostrar/ocultar el input manual
-                    didOpen: () => {
-                        const select = document.getElementById('swal-causa');
-                        const manualInput = document.getElementById('swal-causa-manual');
+                        // LÓGICA DEL DESPLEGABLE
+                        didOpen: () => {
+                            const popup = Swal.getPopup();
+                            const select = popup.querySelector('#swal-causa');
+                            const manualInput = popup.querySelector('#swal-causa-manual');
 
-                        select.addEventListener('change', () => {
-                            if (select.value === '_otro_') {
-                                manualInput.style.display = 'block';
-                                manualInput.focus();
-                            } else {
-                                manualInput.style.display = 'none';
-                                manualInput.value = ''; // Limpiar si se oculta
+                            if (select && manualInput) {
+                                select.addEventListener('change', () => {
+                                    if (select.value === '_otro_') {
+                                        manualInput.style.display = 'block';
+                                        manualInput.focus();
+                                    } else {
+                                        manualInput.style.display = 'none';
+                                        manualInput.value = '';
+                                    }
+                                });
                             }
-                        });
-                    },
-                    // Lógica para recoger el dato correcto
-                    preConfirm: () => {
-                        const select = document.getElementById('swal-causa');
-                        const manualInput = document.getElementById('swal-causa-manual');
-                        const fechaBaja = document.getElementById('swal-fecha').value;
+                        },
 
-                        let causaFinal = select.value;
+                        // LÓGICA DE VALIDACIÓN
+                        preConfirm: () => {
+                            const popup = Swal.getPopup();
+                            const select = popup.querySelector('#swal-causa');
+                            const manualInput = popup.querySelector('#swal-causa-manual');
+                            const fechaInput = popup.querySelector('#swal-fecha');
 
-                        // Si han elegido "Otro", validamos y cogemos el texto manual
-                        if (causaFinal === '_otro_') {
-                            causaFinal = manualInput.value.trim();
-                            if (!causaFinal) {
-                                Swal.showValidationMessage('Por favor, escribe el motivo manual de la baja');
+                            let causaFinal = select.value;
+                            if (causaFinal === '_otro_') {
+                                causaFinal = manualInput.value.trim();
+                                if (!causaFinal) {
+                                    Swal.showValidationMessage('Debes especificar el motivo de la baja');
+                                    return false;
+                                }
+                            }
+
+                            if (!fechaInput.value) {
+                                Swal.showValidationMessage('Selecciona la fecha de baja');
                                 return false;
                             }
+
+                            return { causa: causaFinal, fechaBaja: fechaInput.value };
                         }
+                    });
 
-                        if (!fechaBaja) {
-                            Swal.showValidationMessage('Selecciona la fecha de baja');
-                            return false;
-                        }
+                    // 5. Generar si hay datos
+                    if (formValues) {
+                        Swal.fire({ title: 'Generando...', didOpen: () => Swal.showLoading() });
 
-                        return { causa: causaFinal, fechaBaja: fechaBaja };
-                    }
-                });
+                        // Obtener cotizaciones (con fallback a array vacío si falla)
+                        let cotizaciones = [];
+                        try {
+                            const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
+                            if (res.ok) cotizaciones = await res.json();
+                        } catch (err) { console.error("Error obteniendo cotizaciones", err); }
 
-                if (formValues) {
-                    try {
-                        Swal.fire({
-                            title: 'Obteniendo cotizaciones...',
-                            didOpen: () => { Swal.showLoading(); }
-                        });
-
-                        const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
-                        // Si falla la API, pasamos array vacío para no bloquear el PDF
-                        const cotizaciones = res.ok ? await res.json() : [];
-
+                        // LLAMADA AL GENERADOR
                         if (typeof generarCertificadoEmpresa === 'function') {
                             generarCertificadoEmpresa(empresa, empleado, cotizaciones, formValues.causa, formValues.fechaBaja);
                             Swal.close();
                         } else {
-                            throw new Error("La función de generación de certificado no está cargada.");
+                            Swal.fire('Error', 'No se ha cargado el script del generador (certificadoGenerator.js).', 'error');
                         }
-                    } catch (err) {
-                        console.error(err);
-                        Swal.fire('Error', 'Hubo un error al generar el certificado: ' + err.message, 'error');
                     }
+
+                } catch (error) {
+                    console.error("Error en app.generarCertificado:", error);
+                    Swal.fire('Error Inesperado', error.message, 'error');
                 }
             };
 
@@ -3358,95 +3410,257 @@
             };
 
             // ==========================================================
-            // --- LÓGICA DE HISTORIAL ---
+            // --- LÓGICA DE HISTORIAL AVANZADA (Buscador, Orden, Paginación) ---
             // ==========================================================
+
+            // 1. Estado del Historial
+            let historialState = {
+                rawData: [],        // Datos originales de la API
+                filteredData: [],   // Datos filtrados y ordenados
+                currentPage: 1,
+                rowsPerPage: 10,
+                sortKey: 'fecha_creacion', // Columna por defecto
+                sortAsc: false,     // Orden descendente (más reciente primero)
+                searchTerm: ''
+            };
+
+            // Referencias DOM
             const tablaHistorialBody = document.getElementById('tabla-historial-body');
             const btnRefreshHistorial = document.getElementById('btn-refresh-historial');
+            const searchInput = document.getElementById('historial-search');
+            const rowsPerPageSelect = document.getElementById('historial-rows-per-page');
+            const btnPrevPage = document.getElementById('btn-prev-page');
+            const btnNextPage = document.getElementById('btn-next-page');
+            const paginationInfo = document.getElementById('historial-pagination-info');
+            const sortHeaders = document.querySelectorAll('.sort-header');
 
+            // 2. Función Principal: Cargar Datos de API
             const renderHistorial = async () => {
                 if (!tablaHistorialBody) return;
 
+                // Loader inicial
                 tablaHistorialBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto"></i></td></tr>';
                 lucide.createIcons();
 
                 try {
                     const response = await fetch('/api/historial');
-                    const historial = await response.json();
+                    const data = await response.json();
 
-                    tablaHistorialBody.innerHTML = '';
+                    // Normalizar datos para facilitar búsqueda y orden
+                    historialState.rawData = data.map(item => {
+                        // Determinar nombre empleado
+                        const nombre = item.empleado_nombre ||
+                            (item.datos_completo && item.datos_completo.empleado ? item.datos_completo.empleado.nombre : 'Desconocido');
 
-                    if (!historial || historial.length === 0) {
-                        tablaHistorialBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-4">No hay nóminas guardadas.</td></tr>';
-                        return;
-                    }
+                        // Periodo string para ordenar
+                        const periodoStr = `${String(item.anio)}-${String(item.mes).padStart(2, '0')}`;
 
-                    historial.forEach(item => {
-                        const tr = document.createElement('tr');
-
-                        const fechaCreacion = new Date(item.fecha_creacion).toLocaleDateString() + ' ' + new Date(item.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                        // LÓGICA MEJORADA PARA OBTENER EL NOMBRE
-                        // 1. Intentamos usar el nombre que viene del JOIN de SQL (lo más seguro)
-                        // 2. Si no, intentamos sacarlo del JSON guardado
-                        // 3. Si falla, mostramos el ID o "Desconocido"
-                        let nombreEmpleado = item.empleado_nombre ||
-                            (item.datos_completo && item.datos_completo.empleado ? item.datos_completo.empleado.nombre : 'Empleado Desconocido');
-
-                        // Construcción del periodo (Mes/Año)
-                        let periodoTexto = `${item.mes}/${item.anio}`;
-
-                        let devengado = parseFloat(item.total_devengado || 0).toFixed(2);
-                        let liquido = parseFloat(item.liquido_percibir || 0).toFixed(2);
-
-                        tr.innerHTML = `
-                            <td>${fechaCreacion}</td>
-                            <td>${nombreEmpleado}</td>
-                            <td>${periodoTexto}</td>
-                            <td>${devengado} €</td>
-                            <td class="font-bold text-green-400">${liquido} €</td>
-                            <td class="flex space-x-2">
-                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial" data-full-json='${item.datos_completo ? JSON.stringify(item.datos_completo).replace(/'/g, "&apos;") : "null"}'>
-                                    <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver
-                                </button>
-                                <button class="btn bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2 btn-borrar-historial" data-id="${item.id}" data-nombre="${nombreEmpleado}">
-                                    <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Borrar
-                                </button>
-                            </td>
-                        `;
-
-                        // --- LÓGICA BORRAR ---
-                        const btnBorrar = tr.querySelector('.btn-borrar-historial');
-                        btnBorrar.onclick = () => {
-                            showModal({
-                                title: 'Confirmar Borrado',
-                                message: `¿Estás seguro de que deseas borrar la nómina de ${nombreEmpleado} (${periodoTexto})? Esta acción no se puede deshacer.`,
-                                type: 'confirm',
-                                onConfirm: async () => {
-                                    try {
-                                        const res = await fetch(`/api/nominas/${item.id}`, { method: 'DELETE' });
-                                        if (res.ok) {
-                                            renderHistorial();
-                                        } else {
-                                            alert("Error al intentar borrar la nómina.");
-                                        }
-                                    } catch (err) {
-                                        console.error(err);
-                                        alert("Error de conexión.");
-                                    }
-                                }
-                            });
+                        return {
+                            ...item,
+                            _nombreNormalizado: nombre.toLowerCase(),
+                            _nombreDisplay: nombre,
+                            _periodoSort: periodoStr, // YYYY-MM para ordenar correctamente
+                            _periodoDisplay: `${item.mes}/${item.anio}`
                         };
-
-                        tablaHistorialBody.appendChild(tr);
                     });
 
-                    lucide.createIcons();
+                    // Aplicar filtros iniciales
+                    applyHistorialFilters();
 
                 } catch (error) {
                     console.error("Error historial:", error);
                     tablaHistorialBody.innerHTML = '<tr><td colspan="6" class="text-center text-red-500 py-4">Error cargando historial.</td></tr>';
                 }
             };
+
+            // 3. Función de Procesamiento (Filtrar y Ordenar)
+            const applyHistorialFilters = () => {
+                let data = [...historialState.rawData];
+
+                // A. Filtrado por buscador
+                if (historialState.searchTerm) {
+                    const term = historialState.searchTerm.toLowerCase();
+                    data = data.filter(item =>
+                        item._nombreNormalizado.includes(term) ||
+                        item._periodoDisplay.includes(term) ||
+                        (item.liquido_percibir && item.liquido_percibir.toString().includes(term))
+                    );
+                }
+
+                // B. Ordenación
+                data.sort((a, b) => {
+                    let valA = a[historialState.sortKey];
+                    let valB = b[historialState.sortKey];
+
+                    // Mapeos especiales para claves compuestas
+                    if (historialState.sortKey === 'empleado_nombre') {
+                        valA = a._nombreDisplay; valB = b._nombreDisplay;
+                    } else if (historialState.sortKey === 'periodo') {
+                        valA = a._periodoSort; valB = b._periodoSort;
+                    }
+
+                    // Comparación Numérica vs String
+                    if (typeof valA === 'number' && typeof valB === 'number') {
+                        return historialState.sortAsc ? valA - valB : valB - valA;
+                    } else {
+                        // Comparación de Strings
+                        valA = String(valA || '').toLowerCase();
+                        valB = String(valB || '').toLowerCase();
+                        if (valA < valB) return historialState.sortAsc ? -1 : 1;
+                        if (valA > valB) return historialState.sortAsc ? 1 : -1;
+                        return 0;
+                    }
+                });
+
+                historialState.filteredData = data;
+                historialState.currentPage = 1; // Resetear a pag 1 al filtrar/ordenar
+                updateHistorialTableUI();
+            };
+
+            // 4. Función de Renderizado UI (Paginación y HTML)
+            const updateHistorialTableUI = () => {
+                const { filteredData, currentPage, rowsPerPage } = historialState;
+
+                // Calcular índices paginación
+                const totalItems = filteredData.length;
+                const totalPages = Math.ceil(totalItems / rowsPerPage);
+                const startIndex = (currentPage - 1) * rowsPerPage;
+                const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+
+                const pageData = filteredData.slice(startIndex, endIndex);
+
+                // Renderizar Tabla
+                tablaHistorialBody.innerHTML = '';
+
+                if (pageData.length === 0) {
+                    tablaHistorialBody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500 py-4">No se encontraron registros.</td></tr>';
+                } else {
+                    pageData.forEach(item => {
+                        const tr = document.createElement('tr');
+
+                        const fechaCreacion = new Date(item.fecha_creacion).toLocaleDateString() + ' ' + new Date(item.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const devengado = parseFloat(item.total_devengado || 0).toFixed(2);
+                        const liquido = parseFloat(item.liquido_percibir || 0).toFixed(2);
+
+                        tr.innerHTML = `
+                            <td class="text-sm">${fechaCreacion}</td>
+                            <td class="font-medium text-white">${item._nombreDisplay}</td>
+                            <td>${item._periodoDisplay}</td>
+                            <td>${devengado} €</td>
+                            <td class="font-bold text-green-400">${liquido} €</td>
+                            <td class="flex space-x-2">
+                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial" data-full-json='${item.datos_completo ? JSON.stringify(item.datos_completo).replace(/'/g, "&apos;") : "null"}'>
+                                    <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver
+                                </button>
+                                <button class="btn bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2 btn-borrar-historial" data-id="${item.id}" data-nombre="${item._nombreDisplay}">
+                                    <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Borrar
+                                </button>
+                            </td>
+                        `;
+
+                        // Lógica de borrado (se mantiene igual, usando la lógica existente en el DOM)
+                        const btnBorrar = tr.querySelector('.btn-borrar-historial');
+                        btnBorrar.onclick = () => {
+                            showModal({
+                                title: 'Confirmar Borrado',
+                                message: `¿Borrar nómina de ${item._nombreDisplay} (${item._periodoDisplay})?`,
+                                type: 'confirm',
+                                onConfirm: async () => {
+                                    try {
+                                        const res = await fetch(`/api/nominas/${item.id}`, { method: 'DELETE' });
+                                        if (res.ok) renderHistorial(); // Recarga completa al borrar
+                                        else alert("Error al borrar.");
+                                    } catch (err) { console.error(err); }
+                                }
+                            });
+                        };
+
+                        tablaHistorialBody.appendChild(tr);
+                    });
+                }
+
+                // Actualizar Controles de Paginación
+                paginationInfo.textContent = totalItems > 0
+                    ? `Mostrando ${startIndex + 1} a ${endIndex} de ${totalItems}`
+                    : 'Sin resultados';
+
+                btnPrevPage.disabled = currentPage === 1;
+                btnNextPage.disabled = currentPage === totalPages || totalPages === 0;
+
+                lucide.createIcons();
+            };
+
+            // 5. Event Listeners (Búsqueda, Paginación, Orden)
+
+            // Buscador (Debounce ligero)
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    historialState.searchTerm = e.target.value;
+                    applyHistorialFilters();
+                }, 300);
+            });
+
+            // Selector filas por página
+            rowsPerPageSelect.addEventListener('change', (e) => {
+                historialState.rowsPerPage = parseInt(e.target.value);
+                applyHistorialFilters();
+            });
+
+            // Botones Paginación
+            btnPrevPage.addEventListener('click', () => {
+                if (historialState.currentPage > 1) {
+                    historialState.currentPage--;
+                    updateHistorialTableUI();
+                }
+            });
+
+            btnNextPage.addEventListener('click', () => {
+                const totalPages = Math.ceil(historialState.filteredData.length / historialState.rowsPerPage);
+                if (historialState.currentPage < totalPages) {
+                    historialState.currentPage++;
+                    updateHistorialTableUI();
+                }
+            });
+
+            // Ordenación por Headers
+            sortHeaders.forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.dataset.key;
+
+                    // Alternar dirección si es la misma columna
+                    if (historialState.sortKey === key) {
+                        historialState.sortAsc = !historialState.sortAsc;
+                    } else {
+                        historialState.sortKey = key;
+                        historialState.sortAsc = true; // Default ascendente para nueva col
+                    }
+
+                    // Actualizar iconos visuales
+                    sortHeaders.forEach(h => {
+                        const icon = h.querySelector('i'); // Lucide icon
+                        h.classList.remove('text-blue-400'); // Quitar color activo
+                        if (icon) icon.setAttribute('data-lucide', 'arrow-up-down'); // Reset icono
+                    });
+
+                    // Icono activo
+                    th.classList.add('text-blue-400');
+                    const activeIcon = th.querySelector('i');
+                    if (activeIcon) {
+                        // Nota: Lucide necesita createIcons para cambiar dinamicamente, 
+                        // pero podemos rotar con CSS o cambiar atributo si re-renderizamos.
+                        // Para simplificar, cambiamos la clase de color arriba.
+                    }
+
+                    applyHistorialFilters();
+                });
+            });
+
+            // Botón Refrescar
+            if (btnRefreshHistorial) {
+                btnRefreshHistorial.addEventListener('click', renderHistorial);
+            }
 
             if (btnRefreshHistorial) {
                 btnRefreshHistorial.addEventListener('click', renderHistorial);
