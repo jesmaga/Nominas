@@ -422,9 +422,29 @@ app.delete('/api/nominas/:id', async (req, res) => {
 
 app.get('/api/historial', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM nominas ORDER BY fecha_creacion DESC LIMIT 50');
-        res.json(result.rows);
+        const query = `
+            SELECT 
+                n.id, 
+                n.anio, 
+                n.mes, 
+                n.total_devengado, 
+                n.liquido_percibir, 
+                n.fecha_creacion,
+                n.datos_completo,
+                e.nombre as empleado_nombre, 
+                e.puesto,
+                e.dni,
+                e.nss,
+                e.antiguedad
+            FROM nominas n
+            JOIN empleados e ON n.empleado_id = e.id
+            ORDER BY n.anio DESC, n.mes DESC, n.id DESC
+            LIMIT 50
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
     } catch (error) {
+        console.error("Error en /api/historial:", error);
         res.status(500).json({ error: error.message });
     }
 });
