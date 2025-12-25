@@ -2544,6 +2544,20 @@
 
             // --- LÓGICA CERTIFICADO DE EMPRESA ---
             app.generarCertificado = async (empleadoId) => {
+                // Validar que la variable global 'empresa' (cargada en loadDataFromDB) existe
+                if (!empresa || Object.keys(empresa).length === 0) {
+                    // Intentar cargarla de nuevo por si acaso
+                    try {
+                        const resEmp = await fetch('/api/config/empresa');
+                        empresa = await resEmp.json() || {};
+                    } catch (e) { console.error("Error cargando empresa", e); }
+
+                    if (!empresa || !empresa.nombre) {
+                        Swal.fire('Atención', 'Faltan los datos de la Empresa. Ve a Admin > Datos de Empresa y guárdalos primero.', 'warning');
+                        return;
+                    }
+                }
+
                 const empleado = empleados.find(e => e.id === empleadoId);
                 const puesto = puestos.find(p => p.id === empleado.puestoId);
 
@@ -3313,23 +3327,20 @@
                     historial.forEach(item => {
                         const tr = document.createElement('tr');
 
-                        // Parseamos fecha creación
                         const fechaCreacion = new Date(item.fecha_creacion).toLocaleDateString() + ' ' + new Date(item.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                        // Intentamos extraer datos del JSONB
-                        let nombreEmpleado = item.empleado_id; // Fallback
+                        // LÓGICA MEJORADA PARA OBTENER EL NOMBRE
+                        // 1. Intentamos usar el nombre que viene del JOIN de SQL (lo más seguro)
+                        // 2. Si no, intentamos sacarlo del JSON guardado
+                        // 3. Si falla, mostramos el ID o "Desconocido"
+                        let nombreEmpleado = item.empleado_nombre ||
+                            (item.datos_completo && item.datos_completo.empleado ? item.datos_completo.empleado.nombre : 'Empleado Desconocido');
+
+                        // Construcción del periodo (Mes/Año)
                         let periodoTexto = `${item.mes}/${item.anio}`;
+
                         let devengado = parseFloat(item.total_devengado || 0).toFixed(2);
                         let liquido = parseFloat(item.liquido_percibir || 0).toFixed(2);
-
-                        // Si tenemos el JSON completo, sacamos nombres más bonitos
-                        if (item.datos_completo) {
-                            if (item.datos_completo.empleado) nombreEmpleado = item.datos_completo.empleado.nombre;
-                            if (item.datos_completo.periodo) periodoTexto = `${item.datos_completo.periodo.inicio} - ${item.datos_completo.periodo.fin}`;
-                        } else if (item.empleado_nombre) {
-                            // Compatibilidad con esquema antiguo si quedara data
-                            nombreEmpleado = item.empleado_nombre;
-                        }
 
                         tr.innerHTML = `
                             <td>${fechaCreacion}</td>
@@ -3338,10 +3349,10 @@
                             <td>${devengado} €</td>
                             <td class="font-bold text-green-400">${liquido} €</td>
                             <td class="flex space-x-2">
-                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial">
+                                <button class="btn btn-secondary text-xs py-1 px-2 btn-ver-historial" data-full-json='${item.datos_completo ? JSON.stringify(item.datos_completo).replace(/'/g, "&apos;") : "null"}'>
                                     <i data-lucide="eye" class="w-4 h-4 mr-1"></i> Ver
                                 </button>
-                                <button class="btn bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2 btn-borrar-historial">
+                                <button class="btn bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-2 btn-borrar-historial" data-id="${item.id}" data-nombre="${nombreEmpleado}">
                                     <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Borrar
                                 </button>
                             </td>
