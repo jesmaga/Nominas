@@ -1,5 +1,5 @@
 /**
- * Generador de Certificado de Empresa (Versión Robusta)
+ * Generador de Certificado de Empresa (Versión Robusta ante datos faltantes)
  */
 
 function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fechaBaja) {
@@ -9,7 +9,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
         return;
     }
 
-    // 2. Inicialización segura de objetos para evitar 'undefined'
+    // 2. Inicialización segura (evita errores si el objeto es null)
     const datosEmpresa = empresa || {};
     const datosEmpleado = empleado || {};
     const listaCotizaciones = Array.isArray(cotizaciones) ? cotizaciones : [];
@@ -30,7 +30,8 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.text("MINISTERIO DE TRABAJO Y ECONOMÍA SOCIAL - SEPE", 105, y, { align: "center" });
 
     y += 15;
-    // --- DATOS EMPRESA (Uso de || '' para evitar crash por null) ---
+
+    // --- DATOS EMPRESA ---
     doc.setFont("helvetica", "bold");
     doc.text("DATOS DE LA EMPRESA", MARGIN, y);
     y += 5;
@@ -39,6 +40,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     y += 7;
 
     doc.setFont("helvetica", "normal");
+    // Usamos || '' para que si falta el dato, ponga cadena vacía o guiones
     doc.text(`Nombre/Razón Social: ${datosEmpresa.nombre || '----------------'}`, MARGIN, y);
     y += 5;
     doc.text(`CIF/NIF: ${datosEmpresa.cif || '----------------'}`, MARGIN, y);
@@ -47,6 +49,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.text(`Domicilio: ${datosEmpresa.domicilio || '----------------'}`, MARGIN, y);
 
     y += 15;
+
     // --- DATOS TRABAJADOR ---
     doc.setFont("helvetica", "bold");
     doc.text("DATOS DEL TRABAJADOR", MARGIN, y);
@@ -61,7 +64,8 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.text(`Nº Afiliación S.S.: ${datosEmpleado.ss || ''}`, 100, y);
 
     y += 15;
-    // --- CAUSA ---
+
+    // --- CAUSA DE LA BAJA ---
     doc.setFont("helvetica", "bold");
     doc.text("DETALLES DE LA EXTINCIÓN", MARGIN, y);
     y += 5;
@@ -84,12 +88,13 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     doc.text(`Fecha de baja definitiva: ${fechaStr}`, MARGIN, y);
 
     y += 15;
-    // --- TABLA COTIZACIONES ---
+
+    // --- TABLA DE COTIZACIONES ---
     doc.setFont("helvetica", "bold");
     doc.text("COTIZACIONES (Últimos 180 días)", MARGIN, y);
     y += 5;
 
-    // Mapeo seguro: si falta un dato, ponemos '0' o '-'
+    // Mapeo seguro: si un valor viene null, ponemos 0 o '-'
     const body = listaCotizaciones.map(c => [
         c.anio || '-',
         c.mes || '-',
@@ -97,11 +102,11 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
         parseFloat(c.base_cp || 0).toFixed(2) + " €"
     ]);
 
-    // Calcular Totales seguro
+    // Calcular Totales de forma segura
     const totalDias = listaCotizaciones.reduce((acc, c) => acc + parseFloat(c.dias_cotizados || 0), 0);
     const totalBases = listaCotizaciones.reduce((acc, c) => acc + parseFloat(c.base_cp || 0), 0);
 
-    // Verificamos si autotable está disponible
+    // Comprobamos si el plugin autoTable está cargado
     if (doc.autoTable) {
         doc.autoTable({
             startY: y,
@@ -114,13 +119,14 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
             footStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: 'bold' },
             styles: { fontSize: 9 }
         });
+        // Actualizamos Y para lo siguiente
         y = doc.lastAutoTable.finalY + 20;
     } else {
-        doc.text("Error: Plugin AutoTable no cargado.", MARGIN, y + 10);
-        y += 30;
+        doc.text("Tabla de cotizaciones (AutoTable no disponible)", MARGIN, y);
+        y += 20;
     }
 
-    // --- PIE ---
+    // --- PIE DE PÁGINA ---
     const hoy = new Date();
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -130,6 +136,7 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     y += 10;
     doc.text("Firma y sello de la empresa:", MARGIN, y);
 
+    // Nombre de archivo limpio
     const nombreArchivo = (datosEmpleado.nombre || 'Trabajador').replace(/[^a-zA-Z0-9]/g, '_');
     doc.save(`Certificado_Empresa_${nombreArchivo}.pdf`);
 }

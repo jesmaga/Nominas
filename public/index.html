@@ -2550,17 +2550,23 @@
             };
 
             // --- LÓGICA CERTIFICADO DE EMPRESA ---
+            // --- LÓGICA CERTIFICADO DE EMPRESA (CON OPCIÓN MANUAL) ---
             app.generarCertificado = async (empleadoId) => {
-                // Validar que la variable global 'empresa' (cargada en loadDataFromDB) existe
-                if (!empresa || Object.keys(empresa).length === 0) {
-                    // Intentar cargarla de nuevo por si acaso
+
+                // 1. BLOQUE DE SEGURIDAD (Validar Empresa)
+                if (!empresa || !empresa.nombre) {
                     try {
-                        const resEmp = await fetch('/api/config/empresa');
-                        empresa = await resEmp.json() || {};
-                    } catch (e) { console.error("Error cargando empresa", e); }
+                        const res = await fetch('/api/config/empresa');
+                        const data = await res.json();
+                        if (data) empresa = data;
+                    } catch (e) { }
 
                     if (!empresa || !empresa.nombre) {
-                        Swal.fire('Atención', 'Faltan los datos de la Empresa. Ve a Admin > Datos de Empresa y guárdalos primero.', 'warning');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Datos de Empresa faltantes',
+                            text: 'Por favor, ve a la pestaña "Admin > Datos de Empresa" y guarda la configuración antes de generar el certificado.'
+                        });
                         return;
                     }
                 }
@@ -2568,33 +2574,77 @@
                 const empleado = empleados.find(e => e.id === empleadoId);
                 const puesto = puestos.find(p => p.id === empleado.puestoId);
 
-                if (!empleado || !puesto) {
-                    Swal.fire('Error', 'No se encontró la información del empleado o su puesto.', 'error');
+                if (!empleado) {
+                    Swal.fire('Error', 'No se encontró la información del empleado.', 'error');
                     return;
                 }
 
+                // 2. MODAL CON LÓGICA DE CAMPO MANUAL
                 const { value: formValues } = await Swal.fire({
                     title: 'Generar Certificado de Empresa',
-                    html:
-                        '<div class="text-left">' +
-                        '<label class="block text-sm font-medium text-gray-700 font-bold mb-1">Causa de Extinción</label>' +
-                        '<select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-4" style="display: flex; margin: 0 auto 1.25em;">' +
-                        '<option value="Fin de contrato">Fin de contrato</option>' +
-                        '<option value="Despido">Despido</option>' +
-                        '<option value="Baja voluntaria">Baja voluntaria</option>' +
-                        '</select>' +
-                        '<label class="block text-sm font-medium text-gray-700 font-bold mb-1">Fecha de Baja</label>' +
-                        '<input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" style="margin: 0 auto;" value="' + formatDateToYMD(new Date()) + '">' +
-                        '</div>',
+                    html: `
+                        <div class="text-left">
+                            <label class="block text-sm font-medium text-gray-700 font-bold mb-1">Causa de Extinción</label>
+                            
+                            <select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-2" style="display: flex; margin: 0 auto 0.5em;">
+                                <option value="Fin de contrato">Fin de contrato</option>
+                                <option value="Despido">Despido</option>
+                                <option value="Baja voluntaria">Baja voluntaria</option>
+                                <option value="No superar periodo de prueba">No superar periodo de prueba</option>
+                                <option value="_otro_">Otro (Especificar manualmente)...</option>
+                            </select>
+
+                            <input id="swal-causa-manual" type="text" placeholder="Escribe el motivo aquí..." 
+                                   class="swal2-input w-full border rounded p-2 mb-4 hidden" 
+                                   style="margin: 0 auto 1.25em; display: none;">
+
+                            <label class="block text-sm font-medium text-gray-700 font-bold mb-1">Fecha de Baja</label>
+                            <input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" 
+                                   style="margin: 0 auto;" value="${formatDateToYMD(new Date())}">
+                        </div>
+                    `,
                     focusConfirm: false,
                     showCancelButton: true,
                     confirmButtonText: 'Generar PDF',
                     cancelButtonText: 'Cancelar',
+                    // Lógica para mostrar/ocultar el input manual
+                    didOpen: () => {
+                        const select = document.getElementById('swal-causa');
+                        const manualInput = document.getElementById('swal-causa-manual');
+
+                        select.addEventListener('change', () => {
+                            if (select.value === '_otro_') {
+                                manualInput.style.display = 'block';
+                                manualInput.focus();
+                            } else {
+                                manualInput.style.display = 'none';
+                                manualInput.value = ''; // Limpiar si se oculta
+                            }
+                        });
+                    },
+                    // Lógica para recoger el dato correcto
                     preConfirm: () => {
-                        return {
-                            causa: document.getElementById('swal-causa').value,
-                            fechaBaja: document.getElementById('swal-fecha').value
+                        const select = document.getElementById('swal-causa');
+                        const manualInput = document.getElementById('swal-causa-manual');
+                        const fechaBaja = document.getElementById('swal-fecha').value;
+
+                        let causaFinal = select.value;
+
+                        // Si han elegido "Otro", validamos y cogemos el texto manual
+                        if (causaFinal === '_otro_') {
+                            causaFinal = manualInput.value.trim();
+                            if (!causaFinal) {
+                                Swal.showValidationMessage('Por favor, escribe el motivo manual de la baja');
+                                return false;
+                            }
                         }
+
+                        if (!fechaBaja) {
+                            Swal.showValidationMessage('Selecciona la fecha de baja');
+                            return false;
+                        }
+
+                        return { causa: causaFinal, fechaBaja: fechaBaja };
                     }
                 });
 
@@ -2606,10 +2656,9 @@
                         });
 
                         const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
-                        if (!res.ok) throw new Error("Fallo al obtener cotizaciones");
-                        const cotizaciones = await res.json();
+                        // Si falla la API, pasamos array vacío para no bloquear el PDF
+                        const cotizaciones = res.ok ? await res.json() : [];
 
-                        // Generar el PDF usando la nueva función del generador
                         if (typeof generarCertificadoEmpresa === 'function') {
                             generarCertificadoEmpresa(empresa, empleado, cotizaciones, formValues.causa, formValues.fechaBaja);
                             Swal.close();
