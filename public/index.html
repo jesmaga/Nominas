@@ -3293,54 +3293,6 @@
             const tablaHistorialBody = document.getElementById('tabla-historial-body');
             const btnRefreshHistorial = document.getElementById('btn-refresh-historial');
 
-            // --- FUNCIÓN UNIFICADA PARA VER NÓMINA ---
-            app.verNomina = (data) => {
-                try {
-                    // 1. Navegamos a la pestaña de nóminas
-                    showPage('nominas');
-
-                    // 2. Establecemos variable global
-                    ultimaNominaCalculada = {
-                        nomina: data.nomina,
-                        empleado: data.empleado,
-                        periodo: data.periodo,
-                        esHistorial: true // Flag importante para identificar modo histórico
-                    };
-
-                    // 3. Renderizamos el resultado
-                    displayNominaResult(data.nomina, data.empleado);
-
-                    // 4. Inyectamos indicador visual de MODO HISTÓRICO
-                    const container = document.getElementById('nomina-resultado');
-                    if (container) {
-                        // Limpiamos banners anteriores si los hay
-                        const oldBanner = container.querySelector('.history-banner');
-                        if (oldBanner) oldBanner.remove();
-
-                        const banner = document.createElement('div');
-                        banner.className = 'history-banner bg-yellow-900 border-l-4 border-yellow-500 text-yellow-100 p-4 mb-4 rounded';
-                        banner.innerHTML = `
-                            <div class="flex items-center">
-                                <i data-lucide="archive" class="w-6 h-6 mr-3"></i>
-                                <div>
-                                    <p class="font-bold">Vista de Historial</p>
-                                    <p class="text-sm">Estás viendo una copia guardada. No es un cálculo en tiempo real.</p>
-                                </div>
-                            </div>
-                        `;
-                        container.prepend(banner);
-                        lucide.createIcons();
-                    }
-
-                    // 5. Ocultamos botón de guardar BD (ya está guardada)
-                    if (btnGuardarIndividualBd) btnGuardarIndividualBd.style.display = 'none';
-
-                } catch (err) {
-                    console.error("Error al abrir nómina:", err);
-                    alert("Error al intentar visualizar los datos de la nómina.");
-                }
-            };
-
             const renderHistorial = async () => {
                 if (!tablaHistorialBody) return;
 
@@ -3348,8 +3300,7 @@
                 lucide.createIcons();
 
                 try {
-                    // Usamos el endpoint que devuelve datos completos
-                    const response = await fetch('/api/nominas');
+                    const response = await fetch('/api/historial');
                     const historial = await response.json();
 
                     tablaHistorialBody.innerHTML = '';
@@ -3365,15 +3316,19 @@
                         // Parseamos fecha creación
                         const fechaCreacion = new Date(item.fecha_creacion).toLocaleDateString() + ' ' + new Date(item.fecha_creacion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                        // Datos base
-                        let nombreEmpleado = item.empleado_nombre || item.empleado_id;
+                        // Intentamos extraer datos del JSONB
+                        let nombreEmpleado = item.empleado_id; // Fallback
                         let periodoTexto = `${item.mes}/${item.anio}`;
                         let devengado = parseFloat(item.total_devengado || 0).toFixed(2);
                         let liquido = parseFloat(item.liquido_percibir || 0).toFixed(2);
 
-                        // Si tenemos el JSON completo, mejoramos el texto del periodo
-                        if (item.datos_completo && item.datos_completo.periodo) {
-                            periodoTexto = `${item.datos_completo.periodo.inicio} - ${item.datos_completo.periodo.fin}`;
+                        // Si tenemos el JSON completo, sacamos nombres más bonitos
+                        if (item.datos_completo) {
+                            if (item.datos_completo.empleado) nombreEmpleado = item.datos_completo.empleado.nombre;
+                            if (item.datos_completo.periodo) periodoTexto = `${item.datos_completo.periodo.inicio} - ${item.datos_completo.periodo.fin}`;
+                        } else if (item.empleado_nombre) {
+                            // Compatibilidad con esquema antiguo si quedara data
+                            nombreEmpleado = item.empleado_nombre;
                         }
 
                         tr.innerHTML = `
@@ -3396,9 +3351,9 @@
                         const btnVer = tr.querySelector('.btn-ver-historial');
                         btnVer.onclick = () => {
                             if (item.datos_completo) {
-                                app.verNomina(item.datos_completo);
+                                (typeof app.verNomina === 'function') ? app.verNomina(item.datos_completo) : alert("No se pudo cargar el visualizador.");
                             } else {
-                                alert("Esta nómina no tiene datos detallados guardados (formato antiguo).");
+                                alert("No hay datos detallados para esta nómina.");
                             }
                         };
 
@@ -3440,6 +3395,63 @@
                 btnRefreshHistorial.addEventListener('click', renderHistorial);
             }
 
+            // Delegación de eventos para botones "Ver/Imprimir" del historial
+            if (tablaHistorialBody) {
+                tablaHistorialBody.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.btn-ver-historial');
+                    if (btn) {
+                        try {
+                            const rawData = btn.dataset.fullJson;
+                            if (!rawData || rawData === 'null') {
+                                alert("Esta nómina no tiene datos detallados guardados (formato antiguo).");
+                                return;
+                            }
+
+                            const data = JSON.parse(rawData);
+
+                            // Reusamos la vista de "Generar Nómina"
+                            // 1. Navegamos a la pestaña
+                            showPage('nominas');
+
+                            // 2. Establecemos variable global
+                            ultimaNominaCalculada = {
+                                nomina: data.nomina,
+                                empleado: data.empleado,
+                                periodo: data.periodo,
+                                esHistorial: true // Flag importante
+                            };
+
+                            // 3. Renderizamos el resultado
+                            displayNominaResult(data.nomina, data.empleado);
+
+                            // 4. Inyectamos indicador visual de MODO HISTÓRICO
+                            const container = document.getElementById('nomina-resultado');
+                            if (container) {
+                                const banner = document.createElement('div');
+                                banner.className = 'bg-yellow-900 border-l-4 border-yellow-500 text-yellow-100 p-4 mb-4 rounded';
+                                banner.innerHTML = `
+                                    <div class="flex items-center">
+                                        <i data-lucide="archive" class="w-6 h-6 mr-3"></i>
+                                        <div>
+                                            <p class="font-bold">Vista de Historial</p>
+                                            <p class="text-sm">Estás viendo una copia guardada. No es un cálculo en tiempo real.</p>
+                                        </div>
+                                    </div>
+                                `;
+                                container.prepend(banner);
+                                lucide.createIcons();
+                            }
+
+                            // 5. Ocultamos botón de guardar BD (ya está guardada)
+                            if (btnGuardarIndividualBd) btnGuardarIndividualBd.style.display = 'none';
+
+                        } catch (err) {
+                            console.error(err);
+                            alert("Error al abrir la nómina histórica.");
+                        }
+                    }
+                });
+            }
 
             // --- Lógica del Modal de Detalle de Nómina ---
             const nominaDetailModalOverlay = document.getElementById('nomina-detail-modal-overlay');

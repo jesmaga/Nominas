@@ -31,11 +31,11 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     // --- Dibujar la estructura de recuadros ---
     doc.setLineWidth(0.2);
     // El ancho total ahora es 185mm (de 15 a 200), igual que el cuerpo
-    doc.rect(MARGIN, headerStartY, 185, boxHeight);
+    doc.rect(MARGIN, headerStartY, 185, boxHeight); 
     doc.line(separatorX, headerStartY, separatorX, headerStartY + boxHeight); // Línea vertical divisoria
 
     y = headerStartY + 5;
-
+    
     const drawHeaderLine = (label, value, x, yPos) => {
         doc.setFontSize(labelSize);
         doc.setFont("helvetica", "normal");
@@ -43,7 +43,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
         doc.text(label, x, yPos);
 
         const labelWidth = doc.getTextWidth(label);
-
+        
         doc.setFontSize(valueSize);
         doc.setFont("courier", "bold");
         doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
@@ -60,8 +60,8 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setTextColor(0, 0, 0);
     doc.text("Código de Cuenta de Cotización a la", col1X, y + (lineHeight * 3));
     doc.text("Seguridad Social:", col1X, y + (lineHeight * 4));
-
-    const cccY = y + (lineHeight * 4);
+    
+    const cccY = y + (lineHeight * 4); 
     doc.setFontSize(valueSize);
     doc.setFont("courier", "bold");
     doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
@@ -75,11 +75,11 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
 
     const yLine4 = y + (lineHeight * 4);
     drawHeaderLine("Grupo de Cotización:", empleado.cotizacion || '09', col2X, yLine4);
-
+    
     const antiguedadLabel = "Fecha de antigüedad:";
-    const antiguedadLabelX = col2X + 40;
+    const antiguedadLabelX = col2X + 40; 
     const antiguedadDate = new Date(empleado.antiguedad + 'T00:00:00').toLocaleDateString('es-ES');
-
+    
     doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
@@ -88,22 +88,22 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFontSize(valueSize);
     doc.setFont("courier", "bold");
     doc.setTextColor(blueColor[0], blueColor[1], blueColor[2]);
-    doc.text(antiguedadDate, antiguedadLabelX + doc.getTextWidth(antiguedadLabel) - 6, yLine4);
-
+    doc.text(antiguedadDate, antiguedadLabelX + doc.getTextWidth(antiguedadLabel) -6, yLine4);
+    
     doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("Número empleado:", col2X + 35, y + lineHeight);
 
     // --- FIN DE LA SECCIÓN MODIFICADA ---
-
+    
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
     y = headerStartY + boxHeight + 3;
 
     doc.setDrawColor(0);
     doc.line(MARGIN, y, 215 - MARGIN, y);
-
+    
     y += 5;
     doc.setFontSize(9);
     const mes = new Date(periodo.inicio + 'T00:00:00').toLocaleString('es-ES', { month: 'long' });
@@ -114,7 +114,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
 
     y += 3;
     doc.line(MARGIN, y, 215 - MARGIN, y);
-
+    
     // =================================================================
     // --- CUERPO Y PIE DE PÁGINA (CON ANCHO CORREGIDO) ---
     // =================================================================
@@ -157,7 +157,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFontSize(labelSize); // Se resetea para el siguiente texto
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
-
+    
     if (nomina.conceptosCalculados && nomina.conceptosCalculados.length > 0) {
         yDevengos += 5;
         doc.setFont("helvetica", "bold");
@@ -325,43 +325,26 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
 
-    // --- FIRMA Y SELLO ---
     y = bodyStartY + 125;
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
     doc.text(`En ${"EL PTO STA MARIA"}, a ${new Date(periodo.fin + 'T00:00:00').getDate()} de ${mes} de ${anio}`, MARGIN, y);
     doc.text("RECIBI", 180, y, { align: 'center' });
 
-    /**
-     * Helper para añadir imágenes de forma segura
-     */
-    const safeAddImage = (doc, base64Data, format, x, y, width, height) => {
-        if (!base64Data) return false;
-        try {
-            let cleanBase64 = base64Data.trim()
-                .replace(/^data:image\/[a-z]+;base64,/, '')
-                .replace(/\s/g, '');
-            if (cleanBase64.length < 10) return false;
-            doc.addImage(cleanBase64, format, x, y, width, height);
-            return true;
-        } catch (e) {
-            console.error("Error al añadir imagen al PDF:", e);
-            return false;
-        }
-    };
+    // 2. Define el tamaño de la imagen en mm
+    const anchoFirma = 40; // 4 cm de ancho
+    const altoFirma = 35;  // 3.5 cm de alto
 
-    const anchoFirma = 40;
-    const altoFirma = 35;
-    const yImagen = y - 10;
+    // 3. Define la posición (x, y)
+    // MARGIN es la 'x' (15)
+    // Calculamos la 'y' para que esté encima del texto "Firma y sello"
+    const yImagen = y - 10; // 10mm por encima del texto
 
-    // Usar safeAddImage para evitar el error Base64
-    if (typeof firmaBase64 !== 'undefined') {
-        if (!safeAddImage(doc, firmaBase64, 'PNG', MARGIN, yImagen, anchoFirma, altoFirma)) {
-            doc.setFontSize(8);
-            doc.setTextColor(150, 150, 150);
-            doc.text("[Sello no disponible]", MARGIN, y + 5);
-            doc.setTextColor(0, 0, 0);
-        }
+    try {
+        // 4. Dibuja la imagen
+        doc.addImage(firmaBase64, 'PNG', MARGIN, yImagen, anchoFirma, altoFirma);
+    } catch (e) {
+        console.error("Error al añadir la imagen de la firma:", e);
+        doc.text("[Error al cargar firma]", MARGIN, y); // Texto alternativo si falla
     }
 
 
@@ -372,7 +355,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     // ### SECCIÓN MODIFICADA: PIE DE PÁGINA EXACTO AL MODELO ###
     // =================================================================
     const PAGE_HEIGHT = 297;
-    const footerStartY = PAGE_HEIGHT - 80; // Posición inicial del pie
+    const footerStartY = PAGE_HEIGHT -80; // Posición inicial del pie
     y = footerStartY + 5;
     Margin_X = MARGIN + 1
 
@@ -382,15 +365,15 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.text("DETERMINACIÓN DE LAS BASES DE COTIZACIÓN A LA SEGURIDAD SOCIAL Y CONCEPTOS DE RECAUDACIÓN CONJUNTA Y DE", Margin_X, y);
     y += 4;
     doc.text("LA BASE SUJETA A RETENCIÓN DEL IRPF Y APORTACIÓN DE LA EMPRESA", Margin_X, y);
-
+    
     y += 6;
     const baseX = 145;
     const tipoX = 165;
     const aportacionX = 198;
-    doc.text("BASE", baseX - 8, y, { align: 'center' });
-    doc.text("TIPO", tipoX - 5, y, { align: 'center' });
-    doc.text("APORTACIÓN", aportacionX - 9, y, { align: 'center' });
-    doc.text("EMPRESA", aportacionX - 9, y + 3, { align: 'center' });
+    doc.text("BASE", baseX-8, y, { align: 'center' });
+    doc.text("TIPO", tipoX-5, y, { align: 'center' });
+    doc.text("APORTACIÓN", aportacionX-9, y, { align: 'center' });
+    doc.text("EMPRESA", aportacionX-9, y+3, { align: 'center' });
 
     const drawBlueValue = (text, x, yPos) => {
         doc.setFontSize(valueSize);
@@ -404,7 +387,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("1. Contingencias comunes", Margin_X, y);
-
+    
     const subLineY = y - 2;
     doc.text("Importe remuneración mensual", Margin_X + 45, subLineY);
     drawBlueValue(nomina.totalDevengos, 120, subLineY);
@@ -412,9 +395,9 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("Importe prorrata pagas extraordinarias", Margin_X + 45, subLineY + 4);
-
+    
     doc.text("TOTAL", Margin_X + 45, subLineY + 8);
-
+    
     drawBlueValue(nomina.baseCotizacion, baseX, y + 6);
     drawBlueValue(nomina.porcCCEmpresa, tipoX, y + 6);
     drawBlueValue(nomina.aportacionEmpresaCC, aportacionX, y + 6);
@@ -424,7 +407,7 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("2. Contingencias profesionales y conceptos", Margin_X, y);
-    doc.text("   de recaudación conjunta", Margin_X, y + 4);
+    doc.text("   de recaudación conjunta", Margin_X, y+4);
 
     const drawProLine = (label, yPos, base, tipo, aportacion) => {
         doc.setFontSize(labelSize);
@@ -444,13 +427,13 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     drawProLine("Formación Profesional", y, nomina.baseCotizacion, nomina.porcFPEmpresa, nomina.aportacionEmpresaFP);
     y += 4;
     drawProLine("Fondo Garantía Salarial", y, nomina.baseCotizacion, nomina.porcFogasaEmpresa, nomina.aportacionEmpresaFogasa);
-
+    
     y += 6;
     doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("3. Cotización adicional horas extraordinarias", Margin_X, y);
-
+    
     y += 5;
     doc.text("4. Base sujeta a retención del IRPF", Margin_X, y);
     drawBlueValue(nomina.totalDevengos, Margin_X + 70, y);
@@ -460,13 +443,13 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
     doc.setTextColor(0, 0, 0);
     doc.text("Total coste:", 110, y);
     drawBlueValue(nomina.totalCoste, 150, y);
-
+    
     doc.setFontSize(labelSize);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 0, 0);
     doc.text("Total:", 165, y);
     drawBlueValue(nomina.totalAportacionesEmpresa, aportacionX, y);
-
+    
     // --- DIBUJAR EL RECUADRO EXTERIOR DEL PIE DE PÁGINA ---
     const footerHeight = (y + 5) - footerStartY;
     doc.setLineWidth(0.2);
@@ -480,10 +463,10 @@ function dibujarPaginaDeNomina(doc, datosNomina) {
 function generarPdfNomina(datosNomina) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
-
+    
     // Llamamos a la función de dibujo principal
     dibujarPaginaDeNomina(doc, datosNomina);
-
+    
     const fileName = `Nomina_${datosNomina.empleado.nombre.replace(/\s+/g, '_')}_${datosNomina.periodo.inicio}.pdf`;
     doc.save(fileName);
 }
@@ -500,14 +483,14 @@ function generarPdfLote(listaResultados, datosEmpresa, todosLosPuestos) {
     listaResultados.forEach(resultado => {
         // Solo procesamos empleados sin errores
         if (resultado.nomina && !resultado.nomina.error) {
-
+            
             if (!primerEmpleado) {
                 doc.addPage(); // Añade nueva página para el siguiente empleado
             }
-
+            
             // Buscamos el puesto del empleado actual
             const puestoEmpleado = todosLosPuestos.find(p => p.id === resultado.empleado.puestoId);
-
+            
             // Preparamos el objeto de datos completo para la función de dibujo
             const datosPagina = {
                 nomina: resultado.nomina,
@@ -516,10 +499,10 @@ function generarPdfLote(listaResultados, datosEmpresa, todosLosPuestos) {
                 puesto: puestoEmpleado,
                 empresa: datosEmpresa
             };
-
+            
             // Llamamos a la función de dibujo principal
             dibujarPaginaDeNomina(doc, datosPagina);
-
+            
             primerEmpleado = false;
         }
     });
