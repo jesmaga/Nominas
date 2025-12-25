@@ -1052,7 +1052,10 @@
             <div id="nomina-detail-modal-content" class="p-6 overflow-y-auto flex-1 text-sm text-gray-300">
                 <!-- Content injected by JS -->
             </div>
-            <div class="p-6 border-t border-gray-700 flex justify-end">
+            <div class="p-6 border-t border-gray-700 flex justify-end space-x-3">
+                <button id="btn-print-history-pdf" class="btn btn-primary hidden">
+                    <i data-lucide="printer" class="w-4 h-4 mr-2"></i> Imprimir PDF
+                </button>
                 <button id="btn-close-detail-modal" class="btn btn-secondary">Cerrar</button>
             </div>
         </div>
@@ -3362,16 +3365,6 @@
                             </td>
                         `;
 
-                        // --- LÓGICA VER ---
-                        const btnVer = tr.querySelector('.btn-ver-historial');
-                        btnVer.onclick = () => {
-                            if (item.datos_completo) {
-                                (typeof app.verNomina === 'function') ? app.verNomina(item.datos_completo) : alert("No se pudo cargar el visualizador.");
-                            } else {
-                                alert("No hay datos detallados para esta nómina.");
-                            }
-                        };
-
                         // --- LÓGICA BORRAR ---
                         const btnBorrar = tr.querySelector('.btn-borrar-historial');
                         btnBorrar.onclick = () => {
@@ -3414,31 +3407,60 @@
             if (tablaHistorialBody) {
                 tablaHistorialBody.addEventListener('click', (e) => {
                     const btn = e.target.closest('.btn-ver-historial');
+
                     if (btn) {
                         try {
                             const rawData = btn.dataset.fullJson;
-                            if (!rawData || rawData === 'null') {
-                                alert("Esta nómina no tiene datos detallados guardados (formato antiguo).");
+
+                            if (!rawData || rawData === 'null' || rawData === 'undefined') {
+                                alert("Esta nómina es antigua y no tiene los detalles completos.");
                                 return;
                             }
 
                             const data = JSON.parse(rawData);
 
+                            // 1. Abrir el Modal con los datos
                             if (typeof showNominaDetailInModal === 'function') {
                                 showNominaDetailInModal(data.nomina, data.empleado);
 
-                                // Opcional: Actualizar el título del modal para que sea más claro
+                                // Actualizar Título
                                 const modalTitle = document.getElementById('nomina-detail-modal-title');
                                 if (modalTitle) {
-                                    modalTitle.textContent = `Histórico: ${data.empleado.nombre} (${data.periodo ? data.periodo.inicio : ''})`;
+                                    modalTitle.textContent = `Historial: ${data.empleado.nombre} - ${data.periodo ? data.periodo.inicio : ''}`;
                                 }
+
+                                // 2. CONFIGURAR BOTÓN DE IMPRIMIR
+                                const btnPrint = document.getElementById('btn-print-history-pdf');
+                                if (btnPrint) {
+                                    // Mostrar el botón
+                                    btnPrint.classList.remove('hidden');
+
+                                    // Asignar evento click (sobrescribiendo el anterior para no acumular impresiones)
+                                    btnPrint.onclick = () => {
+                                        // Reconstruir el objeto completo necesario para el PDF
+                                        // Buscamos el puesto actual en la lista global usando el ID guardado en el empleado
+                                        const puestoCompleto = puestos.find(p => p.id === data.empleado.puestoId) || { nombre: 'Puesto Histórico', salario: 0 };
+
+                                        const datosParaPdf = {
+                                            nomina: data.nomina,
+                                            empleado: data.empleado,
+                                            periodo: data.periodo || { inicio: 'Unknown', fin: 'Unknown' }, // Fallback por si acaso
+                                            puesto: puestoCompleto, // Añadimos el puesto recuperado
+                                            empresa: empresa // Añadimos la empresa global
+                                        };
+
+                                        // Llamamos a tu generador de PDF existente
+                                        generarPdfNomina(datosParaPdf);
+                                    };
+                                }
+
                             } else {
                                 console.error("La función showNominaDetailInModal no está definida");
                             }
 
                         } catch (err) {
                             console.error(err);
-                            alert("Error al abrir la nómina histórica.");
+                            alert("Error al abrir el detalle de la nómina.");
                         }
                     }
                 });
