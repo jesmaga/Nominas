@@ -104,52 +104,63 @@ const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memo
 
 // --- FUNCIÓN AYUDANTE: PARSEAR NÚMEROS ESPAÑOLES ---
 // --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
-// --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
 const parseSpanishNumber = (str) => {
     if (!str) return 0;
+    // Quita símbolo € y espacios
     let clean = str.replace(/[€\s]/g, '');
+    // Caso 1.200,50 -> quita punto, cambia coma
     if (clean.includes('.') && clean.includes(',')) {
         clean = clean.replace(/\./g, '').replace(',', '.');
-    } else if (clean.includes(',')) {
+    }
+    // Caso 1200,50 -> cambia coma
+    else if (clean.includes(',')) {
         clean = clean.replace(',', '.');
     }
     const num = parseFloat(clean);
     return isNaN(num) ? 0 : num;
 };
 
-// --- EXTRACTOR DE DATOS (Misma lógica robusta, aplicada a un texto dado) ---
+// --- EXTRACTOR DE DATOS ROBUSTO ---
 const extractDataFromPDF = (text) => {
     const data = {};
     const rawText = text;
     const lowerText = text.toLowerCase();
 
-    // 1. DNI
+    // 1. DNI (Busca 8 dígitos + letra, con o sin guión)
     const dniMatch = rawText.match(/\b(\d{8})[- ]?([A-Z])\b/i);
     if (dniMatch) data.dni = dniMatch[1] + dniMatch[2].toUpperCase();
 
-    // 2. FECHA
+    // 2. FECHA (Texto o Numérica)
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-    const anioTextoMatch = rawText.match(/\b(20\d{2})\b/);
-    if (anioTextoMatch) data.anio = parseInt(anioTextoMatch[1]);
 
+    // Año
+    const anioMatch = rawText.match(/\b(20\d{2})\b/);
+    if (anioMatch) data.anio = parseInt(anioMatch[1]);
+
+    // Mes (Texto)
     const mesTextoIndex = meses.findIndex(m => lowerText.includes(m));
     if (mesTextoIndex !== -1) {
         data.mes = mesTextoIndex + 1;
     } else {
+        // Mes (Numérico dd/mm/yyyy)
         const fechaNumMatch = rawText.match(/(\d{2})[\/\-](\d{2})[\/\-](20\d{2})/);
         if (fechaNumMatch) {
             data.mes = parseInt(fechaNumMatch[2]);
-            data.anio = parseInt(fechaNumMatch[3]);
+            // Si no habíamos encontrado año antes, usamos este
+            if (!data.anio) data.anio = parseInt(fechaNumMatch[3]);
         }
     }
 
-    // 3. VALORES
+    // 3. VALORES MONETARIOS
+    // Liquido
     const liquidoMatch = rawText.match(/(?:Líquido|Neto|Percibir|Liquido)[^0-9]*([\d\.,]+)\s*€?/i);
     if (liquidoMatch) data.liquido_percibir = parseSpanishNumber(liquidoMatch[1]);
 
+    // Devengado
     const devengadoMatch = rawText.match(/Total\s+Devengado[^0-9]*([\d\.,]+)/i);
     if (devengadoMatch) data.total_devengado = parseSpanishNumber(devengadoMatch[1]);
 
+    // Bases
     const baseCCMatch = rawText.match(/Base.*?Comunes[^0-9]*([\d\.,]+)/i);
     if (baseCCMatch) data.base_cc = parseSpanishNumber(baseCCMatch[1]);
 
@@ -165,12 +176,12 @@ const extractDataFromPDF = (text) => {
     return data;
 };
 
-// --- ENDPOINT: SUBIR Y PROCESAR PDF (SOPORTE MULTI-PÁGINA) ---
+// --- ENDPOINT: IMPORTACIÓN MASIVA (PÁGINA A PÁGINA) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
     try {
-        // A. Configurar pdf-parse para separar por páginas
+        // A. Separar el PDF en páginas individuales
         const pageTexts = [];
         const render_page = (pageData) => {
             return pageData.getTextContent({ normalizeWhitespace: false })
@@ -184,43 +195,48 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                         }
                         lastY = item.transform[5];
                     }
-                    pageTexts.push(text); // Guardamos el texto de ESTA página
+                    // Guardamos el texto de ESTA página en el array
+                    pageTexts.push(text);
                     return text;
                 });
         }
 
-        // B. Procesar el PDF
+        // Ejecutar lectura
         await pdfParse(req.file.buffer, { pagerender: render_page });
 
-        console.log(`--> PDF procesado. Páginas detectadas: ${pageTexts.length}`);
+        console.log(`--> PDF procesado. Páginas encontradas: ${pageTexts.length}`);
 
         const results = {
+            total: pageTexts.length,
             processed: 0,
             failed: 0,
             details: []
         };
 
-        // C. Iterar sobre cada página como si fuera una nómina individual
+        // B. Procesar cada página como una nómina independiente
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
             const pageNum = i + 1;
 
-            // Extraer datos
+            // 1. Extraer datos
             const extracted = extractDataFromPDF(text);
 
-            // Validar si parece una nómina (necesitamos al menos DNI)
+            // 2. Validación mínima: ¿Tiene DNI?
             if (!extracted.dni) {
                 results.failed++;
-                results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
+                // Solo reportamos error si la página tiene algo de texto (ignorar páginas en blanco)
+                if (text.trim().length > 50) {
+                    results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
+                }
                 continue;
             }
 
-            // Buscar empleado
+            // 3. Buscar Empleado
             const empRes = await pool.query("SELECT id, nombre FROM empleados WHERE dni = $1", [extracted.dni]);
 
             if (empRes.rows.length === 0) {
                 results.failed++;
-                results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado` });
+                results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado en sistema` });
                 continue;
             }
 
@@ -228,21 +244,22 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             const anio = extracted.anio || new Date().getFullYear();
             const mes = extracted.mes || (new Date().getMonth() + 1);
 
-            // Insertar / Actualizar
+            // 4. Guardar en BD
             const values = [
                 empleado.id,
                 anio,
                 mes,
-                30,
+                30, // Días por defecto
                 extracted.base_cc || 0,
                 extracted.base_cp || 0,
                 extracted.base_irpf || 0,
                 extracted.cuota_irpf || 0,
                 extracted.total_devengado || 0,
                 extracted.liquido_percibir || 0,
-                JSON.stringify({ origen: "importacion_pdf_lote", page: pageNum })
+                JSON.stringify({ origen: "importacion_pdf_lote", pagina: pageNum })
             ];
 
+            // Borrar anterior si existe (sobrescribir)
             await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
 
             await pool.query(`
@@ -262,7 +279,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     } catch (e) {
         console.error("Error procesando PDF:", e);
-        res.status(500).json({ error: "Error crítico al leer el PDF: " + e.message });
+        res.status(500).json({ error: "Error crítico: " + e.message });
     }
 });
 
