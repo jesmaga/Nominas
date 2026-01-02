@@ -2599,128 +2599,182 @@
                 };
             };
 
-            // --- LÓGICA CERTIFICADO DE EMPRESA (CORREGIDA Y AUTÓNOMA) ---
+            // REEMPLAZAR la función app.generarCertificado existente por esta versión:
+
             app.generarCertificado = async (empleadoId) => {
                 try {
-                    // 1. Validar Empresa
+                    // 1. Validaciones previas
                     if (!empresa || !empresa.nombre) {
                         try {
                             const res = await fetch('/api/config/empresa');
                             const data = await res.json();
                             if (data) empresa = data;
                         } catch (e) { console.error(e); }
-
                         if (!empresa || !empresa.nombre) {
-                            Swal.fire('Faltan Datos', 'Guarda los datos de la empresa en la pestaña Admin.', 'warning');
+                            Swal.fire('Faltan Datos', 'Configura los datos de la empresa en Admin antes de generar el certificado.', 'warning');
                             return;
                         }
                     }
 
-                    // 2. Buscar Empleado
                     const empleado = empleados.find(e => e.id === empleadoId);
-                    if (!empleado) {
-                        Swal.fire('Error', 'No se encontró al empleado.', 'error');
-                        return;
-                    }
+                    if (!empleado) return Swal.fire('Error', 'Empleado no encontrado', 'error');
 
-                    // 3. Calcular fecha de hoy para el input (YYYY-MM-DD) de forma directa
-                    const hoy = new Date().toISOString().split('T')[0];
+                    // 2. Obtener cotizaciones reales guardadas en BD (si existen)
+                    let cotizacionesDB = [];
+                    try {
+                        const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
+                        if (res.ok) cotizacionesDB = await res.json();
+                    } catch (err) { console.error("Error fetching cotizaciones", err); }
 
-                    // 4. Mostrar Modal
+                    // 3. Pre-calcular fecha de hoy
+                    const hoyStr = new Date().toISOString().split('T')[0];
+
+                    // 4. FUNCIÓN HELPER: Generar HTML de la tabla de cotizaciones
+                    // Esta función mezcla lo que hay en BD con los meses teóricos anteriores a la baja
+                    const generarHtmlTabla = (fechaBajaStr) => {
+                        const fechaBaja = new Date(fechaBajaStr);
+                        let htmlRows = '';
+
+                        // Generamos 6 filas (últimos 6 meses)
+                        for (let i = 0; i < 6; i++) {
+                            // Clonamos fecha para no mutar
+                            const d = new Date(fechaBaja);
+                            // Restamos i meses. Nota: setMonth maneja el cambio de año automáticamente
+                            d.setMonth(d.getMonth() - i);
+
+                            const mes = d.getMonth() + 1;
+                            const anio = d.getFullYear();
+
+                            // Buscamos si tenemos este dato en la BD
+                            const datoBD = cotizacionesDB.find(c => c.anio === anio && c.mes === mes);
+
+                            // Valores por defecto
+                            const valDias = datoBD ? datoBD.dias_cotizados : '30';
+                            const valBase = datoBD ? parseFloat(datoBD.base_cp).toFixed(2) : '0.00';
+
+                            htmlRows += `
+                                <tr class="bg-gray-100 border-b">
+                                    <td class="p-1"><input type="number" class="swal-anio w-full border p-1 text-center" value="${anio}" readonly></td>
+                                    <td class="p-1"><input type="number" class="swal-mes w-full border p-1 text-center" value="${mes}" readonly></td>
+                                    <td class="p-1"><input type="number" class="swal-dias w-full border p-1 text-right" value="${valDias}"></td>
+                                    <td class="p-1"><input type="number" step="0.01" class="swal-base w-full border p-1 text-right" value="${valBase}"></td>
+                                </tr>
+                            `;
+                        }
+                        return `<table class="w-full text-sm mt-2 mb-4">
+                                    <thead class="bg-gray-200 text-gray-700">
+                                        <tr><th>Año</th><th>Mes</th><th>Días</th><th>Base C.P. (€)</th></tr>
+                                    </thead>
+                                    <tbody id="swal-table-body">${htmlRows}</tbody>
+                                </table>`;
+                    };
+
+                    // 5. MOSTRAR MODAL INTERACTIVO
                     const { value: formValues } = await Swal.fire({
-                        title: 'Certificado de Empresa',
+                        title: 'Datos del Certificado',
+                        width: '600px',
                         html: `
-                            <div class="text-left">
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Causa de Extinción</label>
-                                <select id="swal-causa" class="swal2-select w-full border rounded p-2 mb-2">
-                                    <option value="Fin de contrato">Fin de contrato</option>
-                                    <option value="Despido">Despido</option>
-                                    <option value="Baja voluntaria">Baja voluntaria</option>
-                                    <option value="No superar periodo de prueba">No superar periodo de prueba</option>
-                                    <option value="_otro_">Otro (Especificar)...</option>
-                                </select>
+                            <div class="text-left text-sm">
+                                <div class="mb-4 bg-blue-50 p-3 rounded border border-blue-200">
+                                    <p class="text-blue-800 font-semibold mb-1">📅 Fecha de Baja</p>
+                                    <input id="swal-fecha" type="date" class="w-full border rounded p-2" value="${hoyStr}">
+                                </div>
 
-                                <input id="swal-causa-manual" type="text" placeholder="Escribe el motivo..." 
-                                    class="swal2-input w-full border rounded p-2 mb-4" 
-                                    style="display: none; margin: 0 auto 1em;">
+                                <div class="mb-4">
+                                    <label class="block font-semibold text-gray-700 mb-1">Causa de Extinción</label>
+                                    <select id="swal-causa" class="w-full border rounded p-2 mb-2">
+                                        <option value="Fin de contrato">Fin de contrato</option>
+                                        <option value="Despido disciplinario">Despido disciplinario</option>
+                                        <option value="Despido objetivo">Despido por causas objetivas</option>
+                                        <option value="Baja voluntaria">Baja voluntaria / Dimisión</option>
+                                        <option value="No superar periodo de prueba">No superar periodo de prueba</option>
+                                        <option value="_otro_">Otro (Especificar)...</option>
+                                    </select>
+                                    <input id="swal-causa-manual" type="text" placeholder="Especificar causa..." class="w-full border rounded p-2 hidden">
+                                </div>
 
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Fecha de Baja Efectiva</label>
-                                <input id="swal-fecha" type="date" class="swal2-input w-full border rounded p-2" 
-                                    style="margin: 0 auto;" value="${hoy}">
+                                <div class="mb-2">
+                                    <p class="font-semibold text-gray-700">💰 Cotizaciones (Últimos 180 días)</p>
+                                    <p class="text-xs text-gray-500 mb-2">Edita manualmente si faltan datos en la base de datos.</p>
+                                    <div id="container-tabla-cotizaciones">
+                                        ${generarHtmlTabla(hoyStr)}
+                                    </div>
+                                </div>
                             </div>
                         `,
                         focusConfirm: false,
                         showCancelButton: true,
                         confirmButtonText: 'Generar PDF',
                         cancelButtonText: 'Cancelar',
-
-                        // LÓGICA DEL DESPLEGABLE
                         didOpen: () => {
                             const popup = Swal.getPopup();
-                            const select = popup.querySelector('#swal-causa');
-                            const manualInput = popup.querySelector('#swal-causa-manual');
+                            const fechaInput = popup.querySelector('#swal-fecha');
+                            const containerTabla = popup.querySelector('#container-tabla-cotizaciones');
+                            const selectCausa = popup.querySelector('#swal-causa');
+                            const manualCausa = popup.querySelector('#swal-causa-manual');
 
-                            if (select && manualInput) {
-                                select.addEventListener('change', () => {
-                                    if (select.value === '_otro_') {
-                                        manualInput.style.display = 'block';
-                                        manualInput.focus();
-                                    } else {
-                                        manualInput.style.display = 'none';
-                                        manualInput.value = '';
-                                    }
-                                });
-                            }
+                            // Recalcular tabla si cambia la fecha de baja
+                            fechaInput.addEventListener('change', (e) => {
+                                if (e.target.value) {
+                                    containerTabla.innerHTML = generarHtmlTabla(e.target.value);
+                                }
+                            });
+
+                            // Mostrar input manual de causa
+                            selectCausa.addEventListener('change', () => {
+                                if (selectCausa.value === '_otro_') {
+                                    manualCausa.classList.remove('hidden');
+                                    manualCausa.focus();
+                                } else {
+                                    manualCausa.classList.add('hidden');
+                                }
+                            });
                         },
-
-                        // LÓGICA DE VALIDACIÓN
                         preConfirm: () => {
                             const popup = Swal.getPopup();
-                            const select = popup.querySelector('#swal-causa');
-                            const manualInput = popup.querySelector('#swal-causa-manual');
-                            const fechaInput = popup.querySelector('#swal-fecha');
+                            const fechaBaja = popup.querySelector('#swal-fecha').value;
+                            const selectCausa = popup.querySelector('#swal-causa');
+                            const manualCausa = popup.querySelector('#swal-causa-manual');
 
-                            let causaFinal = select.value;
-                            if (causaFinal === '_otro_') {
-                                causaFinal = manualInput.value.trim();
-                                if (!causaFinal) {
-                                    Swal.showValidationMessage('Debes especificar el motivo de la baja');
-                                    return false;
+                            let causa = selectCausa.value;
+                            if (causa === '_otro_') causa = manualCausa.value;
+
+                            if (!fechaBaja) return Swal.showValidationMessage('La fecha es obligatoria');
+                            if (!causa) return Swal.showValidationMessage('La causa es obligatoria');
+
+                            // RECOLECTAR DATOS DE LA TABLA MANUAL
+                            const rows = popup.querySelectorAll('#swal-table-body tr');
+                            const listaCotizaciones = [];
+
+                            rows.forEach(row => {
+                                const anio = row.querySelector('.swal-anio').value;
+                                const mes = row.querySelector('.swal-mes').value;
+                                const dias = row.querySelector('.swal-dias').value;
+                                const base = row.querySelector('.swal-base').value;
+
+                                // Solo añadimos si hay base o días (evitamos filas vacías si el usuario las borra)
+                                if (parseFloat(dias) > 0 || parseFloat(base) > 0) {
+                                    listaCotizaciones.push({
+                                        anio: parseInt(anio),
+                                        mes: parseInt(mes),
+                                        dias_cotizados: parseFloat(dias),
+                                        base_cp: parseFloat(base)
+                                    });
                                 }
-                            }
+                            });
 
-                            if (!fechaInput.value) {
-                                Swal.showValidationMessage('Selecciona la fecha de baja');
-                                return false;
-                            }
-
-                            return { causa: causaFinal, fechaBaja: fechaInput.value };
+                            return { fechaBaja, causa, listaCotizaciones };
                         }
                     });
 
-                    // 5. Generar si hay datos
                     if (formValues) {
-                        Swal.fire({ title: 'Generando...', didOpen: () => Swal.showLoading() });
-
-                        // Obtener cotizaciones (con fallback a array vacío si falla)
-                        let cotizaciones = [];
-                        try {
-                            const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
-                            if (res.ok) cotizaciones = await res.json();
-                        } catch (err) { console.error("Error obteniendo cotizaciones", err); }
-
-                        // LLAMADA AL GENERADOR
-                        if (typeof generarCertificadoEmpresa === 'function') {
-                            generarCertificadoEmpresa(empresa, empleado, cotizaciones, formValues.causa, formValues.fechaBaja);
-                            Swal.close();
-                        } else {
-                            Swal.fire('Error', 'No se ha cargado el script del generador (certificadoGenerator.js).', 'error');
-                        }
+                        // Llamar al generador con los datos combinados/editados
+                        generarCertificadoEmpresa(empresa, empleado, formValues.listaCotizaciones, formValues.causa, formValues.fechaBaja);
                     }
 
                 } catch (error) {
-                    console.error("Error en app.generarCertificado:", error);
-                    Swal.fire('Error Inesperado', error.message, 'error');
+                    console.error(error);
+                    Swal.fire('Error', 'Hubo un error al preparar el certificado.', 'error');
                 }
             };
 
