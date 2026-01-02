@@ -161,12 +161,12 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
 
     // 2. Define el tamaño de la imagen en mm
     const anchoFirma = 40; // 4 cm de ancho
-    const altoFirma = 40;  // 4 cm de alto
+    const altoFirma = 35;  // 4 cm de alto
 
     // 3. Define la posición (x, y)
     // MARGIN es la 'x' (15)
     // Calculamos la 'y' para que esté encima del texto "Firma y sello"
-    const yImagen = y + 5; // 5mm por encima del texto
+    const yImagen = y; // 5mm por encima del texto
 
     try {
         // 4. Dibuja la imagen
