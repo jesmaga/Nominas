@@ -1010,24 +1010,6 @@
                                 class="form-input pl-9 p-2 text-sm w-full md:w-64">
                         </div>
 
-                        <div
-                            class="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700 flex items-center justify-between">
-                            <div>
-                                <h4 class="text-white font-semibold mb-1">Importar Nómina (PDF)</h4>
-                                <p class="text-xs text-gray-400">Sube un PDF. El sistema leerá el DNI, bases y totales
-                                    automáticamente.</p>
-                            </div>
-                            <div class="flex items-center space-x-3">
-                                <input type="file" id="pdf-upload-input" accept="application/pdf" class="hidden">
-                                <label for="pdf-upload-input" class="cursor-pointer btn btn-secondary">
-                                    <i data-lucide="file-up" class="w-4 h-4 mr-2"></i> Seleccionar PDF
-                                </label>
-                                <button id="btn-upload-pdf-action" class="btn btn-primary hidden">
-                                    <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar
-                                </button>
-                            </div>
-                        </div>
-
                         <select id="historial-rows-per-page" class="form-input p-2 text-sm w-20">
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
@@ -1037,6 +1019,23 @@
 
                         <button id="btn-refresh-historial" class="btn btn-secondary text-xs whitespace-nowrap">
                             <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700 flex items-center justify-between">
+                    <div>
+                        <h4 class="text-white font-semibold mb-1">Importar Nómina (PDF)</h4>
+                        <p class="text-xs text-gray-400">Sube un PDF. El sistema leerá el DNI, bases y totales
+                            automáticamente.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input type="file" id="pdf-upload-input" accept="application/pdf" class="hidden">
+                        <label for="pdf-upload-input" class="cursor-pointer btn btn-secondary">
+                            <i data-lucide="file-up" class="w-4 h-4 mr-2"></i> Seleccionar PDF
+                        </label>
+                        <button id="btn-upload-pdf-action" class="btn btn-primary hidden">
+                            <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar
                         </button>
                     </div>
                 </div>
