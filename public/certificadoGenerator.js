@@ -14,6 +14,11 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
     const datosEmpleado = empleado || {};
     const listaCotizaciones = Array.isArray(cotizaciones) ? cotizaciones : [];
 
+    listaCotizaciones.sort((a, b) => {
+        if (a.anio !== b.anio) return b.anio - a.anio;
+        return b.mes - a.mes;
+    });
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     const MARGIN = 15;

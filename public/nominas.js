@@ -357,6 +357,7 @@ function calcularNomina(empleado, puesto, configSS, fechaInicio, fechaFin, fecha
     const totalCoste = totalDevengado + totalAportacionesEmpresa;
 
     return {
+        diasCotizados: diasCalculoTotal,
         diasCalculoTotal, diasTrabajados, diasBajaEnPeriodo,
         salarioBaseMensualCompleto: salarioBaseMensualCompleto.toFixed(2),
         otrosDevengos: [], // Evitar duplicados en Index.html
