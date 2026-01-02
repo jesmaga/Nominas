@@ -97,6 +97,174 @@ const initDB = async () => {
 // Ejecutamos la inicialización al arrancar
 initDB();
 
+// --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
+
+// --- FUNCIÓN AYUDANTE: PARSEAR NÚMEROS ESPAÑOLES ---
+// --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
+// --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
+const parseSpanishNumber = (str) => {
+    if (!str) return 0;
+    let clean = str.replace(/[€\s]/g, '');
+    if (clean.includes('.') && clean.includes(',')) {
+        clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+        clean = clean.replace(',', '.');
+    }
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+};
+
+// --- EXTRACTOR DE DATOS (Misma lógica robusta, aplicada a un texto dado) ---
+const extractDataFromPDF = (text) => {
+    const data = {};
+    const rawText = text;
+    const lowerText = text.toLowerCase();
+
+    // 1. DNI
+    const dniMatch = rawText.match(/\b(\d{8})[- ]?([A-Z])\b/i);
+    if (dniMatch) data.dni = dniMatch[1] + dniMatch[2].toUpperCase();
+
+    // 2. FECHA
+    const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const anioTextoMatch = rawText.match(/\b(20\d{2})\b/);
+    if (anioTextoMatch) data.anio = parseInt(anioTextoMatch[1]);
+
+    const mesTextoIndex = meses.findIndex(m => lowerText.includes(m));
+    if (mesTextoIndex !== -1) {
+        data.mes = mesTextoIndex + 1;
+    } else {
+        const fechaNumMatch = rawText.match(/(\d{2})[\/\-](\d{2})[\/\-](20\d{2})/);
+        if (fechaNumMatch) {
+            data.mes = parseInt(fechaNumMatch[2]);
+            data.anio = parseInt(fechaNumMatch[3]);
+        }
+    }
+
+    // 3. VALORES
+    const liquidoMatch = rawText.match(/(?:Líquido|Neto|Percibir|Liquido)[^0-9]*([\d\.,]+)\s*€?/i);
+    if (liquidoMatch) data.liquido_percibir = parseSpanishNumber(liquidoMatch[1]);
+
+    const devengadoMatch = rawText.match(/Total\s+Devengado[^0-9]*([\d\.,]+)/i);
+    if (devengadoMatch) data.total_devengado = parseSpanishNumber(devengadoMatch[1]);
+
+    const baseCCMatch = rawText.match(/Base.*?Comunes[^0-9]*([\d\.,]+)/i);
+    if (baseCCMatch) data.base_cc = parseSpanishNumber(baseCCMatch[1]);
+
+    const baseCPMatch = rawText.match(/Base.*?(?:Profesionales|Accidentes)[^0-9]*([\d\.,]+)/i);
+    if (baseCPMatch) data.base_cp = parseSpanishNumber(baseCPMatch[1]);
+
+    const baseIRPFMatch = rawText.match(/Base.*?(?:IRPF|Retención)[^0-9]*([\d\.,]+)/i);
+    if (baseIRPFMatch) data.base_irpf = parseSpanishNumber(baseIRPFMatch[1]);
+
+    const cuotaIRPFMatch = rawText.match(/(?:Cuota|Retención).*?IRPF[^0-9]*([\d\.,]+)/i);
+    if (cuotaIRPFMatch) data.cuota_irpf = parseSpanishNumber(cuotaIRPFMatch[1]);
+
+    return data;
+};
+
+// --- ENDPOINT: SUBIR Y PROCESAR PDF (SOPORTE MULTI-PÁGINA) ---
+app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
+
+    try {
+        // A. Configurar pdf-parse para separar por páginas
+        const pageTexts = [];
+        const render_page = (pageData) => {
+            return pageData.getTextContent({ normalizeWhitespace: false })
+                .then(function (textContent) {
+                    let lastY, text = '';
+                    for (let item of textContent.items) {
+                        if (lastY == item.transform[5] || !lastY) {
+                            text += item.str;
+                        } else {
+                            text += '\n' + item.str;
+                        }
+                        lastY = item.transform[5];
+                    }
+                    pageTexts.push(text); // Guardamos el texto de ESTA página
+                    return text;
+                });
+        }
+
+        // B. Procesar el PDF
+        await pdfParse(req.file.buffer, { pagerender: render_page });
+
+        console.log(`--> PDF procesado. Páginas detectadas: ${pageTexts.length}`);
+
+        const results = {
+            processed: 0,
+            failed: 0,
+            details: []
+        };
+
+        // C. Iterar sobre cada página como si fuera una nómina individual
+        for (let i = 0; i < pageTexts.length; i++) {
+            const text = pageTexts[i];
+            const pageNum = i + 1;
+
+            // Extraer datos
+            const extracted = extractDataFromPDF(text);
+
+            // Validar si parece una nómina (necesitamos al menos DNI)
+            if (!extracted.dni) {
+                results.failed++;
+                results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
+                continue;
+            }
+
+            // Buscar empleado
+            const empRes = await pool.query("SELECT id, nombre FROM empleados WHERE dni = $1", [extracted.dni]);
+
+            if (empRes.rows.length === 0) {
+                results.failed++;
+                results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado` });
+                continue;
+            }
+
+            const empleado = empRes.rows[0];
+            const anio = extracted.anio || new Date().getFullYear();
+            const mes = extracted.mes || (new Date().getMonth() + 1);
+
+            // Insertar / Actualizar
+            const values = [
+                empleado.id,
+                anio,
+                mes,
+                30,
+                extracted.base_cc || 0,
+                extracted.base_cp || 0,
+                extracted.base_irpf || 0,
+                extracted.cuota_irpf || 0,
+                extracted.total_devengado || 0,
+                extracted.liquido_percibir || 0,
+                JSON.stringify({ origen: "importacion_pdf_lote", page: pageNum })
+            ];
+
+            await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
+
+            await pool.query(`
+                INSERT INTO nominas (
+                    empleado_id, anio, mes, dias_cotizados, 
+                    base_cc, base_cp, base_irpf, cuota_irpf, 
+                    total_devengado, liquido_percibir, datos_completo
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            `, values);
+
+            results.processed++;
+            results.details.push({ page: pageNum, status: 'success', empleado: empleado.nombre, periodo: `${mes}/${anio}` });
+        }
+
+        res.json({ success: true, summary: results });
+
+    } catch (e) {
+        console.error("Error procesando PDF:", e);
+        res.status(500).json({ error: "Error crítico al leer el PDF: " + e.message });
+    }
+});
 
 // --- 2. API ENDPOINTS (RUTAS) ---
 
@@ -422,9 +590,26 @@ app.delete('/api/nominas/:id', async (req, res) => {
 
 app.get('/api/historial', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM nominas ORDER BY fecha_creacion DESC LIMIT 50');
-        res.json(result.rows);
+        const query = `
+            SELECT 
+                n.id, 
+                n.anio, 
+                n.mes, 
+                n.total_devengado, 
+                n.liquido_percibir, 
+                n.fecha_creacion,
+                n.datos_completo,
+                e.nombre as empleado_nombre, 
+                e.dni
+            FROM nominas n
+            LEFT JOIN empleados e ON n.empleado_id = e.id
+            ORDER BY n.fecha_creacion DESC
+            LIMIT 50
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
     } catch (error) {
+        console.error("Error historial:", error);
         res.status(500).json({ error: error.message });
     }
 });

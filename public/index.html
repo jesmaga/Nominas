@@ -4354,19 +4354,28 @@
                         const result = await response.json();
 
                         if (result.success) {
-                            // Éxito
-                            Swal.fire({
-                                title: 'Importación Exitosa',
-                                html: `
-                                    <p>${result.message}</p>
-                                    <ul class="text-left text-sm mt-2 bg-gray-100 p-2 rounded text-black">
-                                        <li><b>Líquido:</b> ${result.data.liquido_percibir} €</li>
-                                        <li><b>Devengado:</b> ${result.data.total_devengado} €</li>
-                                        <li><b>Base CC:</b> ${result.data.base_cc} €</li>
-                                    </ul>
-                                `,
-                                icon: 'success'
+                            const summary = result.summary;
+
+                            // Generar lista HTML de resultados
+                            let detailsHtml = '<div class="max-h-60 overflow-y-auto text-left text-sm space-y-1">';
+                            summary.details.forEach(det => {
+                                if (det.status === 'success') {
+                                    detailsHtml += `<div class="text-green-600">✅ Pág ${det.page}: ${det.empleado} (${det.periodo})</div>`;
+                                } else {
+                                    detailsHtml += `<div class="text-red-500">❌ Pág ${det.page}: ${det.reason}</div>`;
+                                }
                             });
+                            detailsHtml += '</div>';
+
+                            Swal.fire({
+                                title: 'Proceso Finalizado',
+                                html: `
+                                    <p class="mb-2"><b>Procesadas:</b> ${summary.processed} | <b>Fallidas:</b> ${summary.failed}</p>
+                                    ${detailsHtml}
+                                `,
+                                icon: summary.failed === 0 ? 'success' : 'warning'
+                            });
+
                             // Recargar historial
                             if (typeof renderHistorial === 'function') renderHistorial();
 
