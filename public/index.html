@@ -1010,6 +1010,24 @@
                                 class="form-input pl-9 p-2 text-sm w-full md:w-64">
                         </div>
 
+                        <div
+                            class="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h4 class="text-white font-semibold mb-1">Importar Nómina (PDF)</h4>
+                                <p class="text-xs text-gray-400">Sube un PDF. El sistema leerá el DNI, bases y totales
+                                    automáticamente.</p>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <input type="file" id="pdf-upload-input" accept="application/pdf" class="hidden">
+                                <label for="pdf-upload-input" class="cursor-pointer btn btn-secondary">
+                                    <i data-lucide="file-up" class="w-4 h-4 mr-2"></i> Seleccionar PDF
+                                </label>
+                                <button id="btn-upload-pdf-action" class="btn btn-primary hidden">
+                                    <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar
+                                </button>
+                            </div>
+                        </div>
+
                         <select id="historial-rows-per-page" class="form-input p-2 text-sm w-20">
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
@@ -4297,6 +4315,76 @@
                         title: "Proceso Finalizado",
                         message: `Guardado completado.\n✅ Correctos: ${guardados}\n❌ Errores/Omitidos: ${errores}`
                     });
+                });
+            }
+
+            // --- LÓGICA IMPORTAR PDF ---
+            const pdfInput = document.getElementById('pdf-upload-input');
+            const btnUploadAction = document.getElementById('btn-upload-pdf-action');
+
+            // Mostrar botón "Procesar" cuando se elige archivo
+            if (pdfInput) {
+                pdfInput.addEventListener('change', () => {
+                    if (pdfInput.files.length > 0) {
+                        btnUploadAction.classList.remove('hidden');
+                        btnUploadAction.textContent = `Procesar: ${pdfInput.files[0].name}`;
+                    }
+                });
+            }
+
+            // Enviar archivo al servidor
+            if (btnUploadAction) {
+                btnUploadAction.addEventListener('click', async () => {
+                    const file = pdfInput.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('nominaPdf', file);
+
+                    // Feedback visual
+                    const originalText = btnUploadAction.innerHTML;
+                    btnUploadAction.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Leyendo...';
+                    btnUploadAction.disabled = true;
+
+                    try {
+                        const response = await fetch('/api/importar-pdf', {
+                            method: 'POST',
+                            body: formData // No poner Content-Type manual, fetch lo hace solo
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            // Éxito
+                            Swal.fire({
+                                title: 'Importación Exitosa',
+                                html: `
+                                    <p>${result.message}</p>
+                                    <ul class="text-left text-sm mt-2 bg-gray-100 p-2 rounded text-black">
+                                        <li><b>Líquido:</b> ${result.data.liquido_percibir} €</li>
+                                        <li><b>Devengado:</b> ${result.data.total_devengado} €</li>
+                                        <li><b>Base CC:</b> ${result.data.base_cc} €</li>
+                                    </ul>
+                                `,
+                                icon: 'success'
+                            });
+                            // Recargar historial
+                            if (typeof renderHistorial === 'function') renderHistorial();
+
+                            // Limpiar input
+                            pdfInput.value = '';
+                            btnUploadAction.classList.add('hidden');
+                        } else {
+                            throw new Error(result.error);
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        Swal.fire('Error', error.message, 'error');
+                    } finally {
+                        btnUploadAction.innerHTML = '<i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar';
+                        btnUploadAction.disabled = false;
+                        lucide.createIcons();
+                    }
                 });
             }
 
