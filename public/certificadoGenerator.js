@@ -232,19 +232,19 @@ function generarCertificadoEmpresa(empresa, empleado, cotizaciones, causa, fecha
 
     // 2. Define el tamaño de la imagen en mm
     const anchoFirma = 40; // 4 cm de ancho
-    const altoFirma = 35;  // 3.5 cm de alto
+    const altoFirma = 40;  // 3.5 cm de alto
 
     // 3. Define la posición (x, y)
     // MARGIN es la 'x' (15)
     // Calculamos la 'y' para que esté encima del texto "Firma y sello"
-    const yImagen = y - 10; // 10mm por encima del texto
+    const yImagen = y + 5; // 5mm por debajo del texto
 
     try {
         // 4. Dibuja la imagen
-        doc.addImage(firmaBase64, 'PNG', MARGIN, yImagen, anchoFirma, altoFirma);
+        doc.addImage(firmaBase64, 'PNG', MARGIN + 120, yImagen, anchoFirma, altoFirma);
     } catch (e) {
         console.error("Error al añadir la imagen de la firma:", e);
-        doc.text("[Error al cargar firma]", MARGIN, y); // Texto alternativo si falla
+        doc.text("[Error al cargar firma]", MARGIN + 120, y); // Texto alternativo si falla
     }
     doc.setFontSize(10);
     doc.text(fechaFirma, MARGIN + 2, y + 15);

@@ -2603,7 +2603,7 @@
 
             app.generarCertificado = async (empleadoId) => {
                 try {
-                    // 1. Validaciones previas
+                    // 1. Validaciones
                     if (!empresa || !empresa.nombre) {
                         try {
                             const res = await fetch('/api/config/empresa');
@@ -2619,36 +2619,28 @@
                     const empleado = empleados.find(e => e.id === empleadoId);
                     if (!empleado) return Swal.fire('Error', 'Empleado no encontrado', 'error');
 
-                    // 2. Obtener cotizaciones reales guardadas en BD (si existen)
+                    // 2. Obtener cotizaciones reales
                     let cotizacionesDB = [];
                     try {
                         const res = await fetch(`/api/nominas/ultimas-cotizaciones/${empleadoId}`);
                         if (res.ok) cotizacionesDB = await res.json();
                     } catch (err) { console.error("Error fetching cotizaciones", err); }
 
-                    // 3. Pre-calcular fecha de hoy
                     const hoyStr = new Date().toISOString().split('T')[0];
 
-                    // 4. FUNCIÓN HELPER: Generar HTML de la tabla de cotizaciones
-                    // Esta función mezcla lo que hay en BD con los meses teóricos anteriores a la baja
+                    // 3. Helper Tabla
                     const generarHtmlTabla = (fechaBajaStr) => {
-                        const fechaBaja = new Date(fechaBajaStr);
+                        const fechaBase = new Date(fechaBajaStr);
                         let htmlRows = '';
-
-                        // Generamos 6 filas (últimos 6 meses)
                         for (let i = 0; i < 6; i++) {
-                            // Clonamos fecha para no mutar
-                            const d = new Date(fechaBaja);
-                            // Restamos i meses. Nota: setMonth maneja el cambio de año automáticamente
+                            const d = new Date(fechaBase);
+                            d.setDate(15); // Truco para evitar saltos de mes
                             d.setMonth(d.getMonth() - i);
 
                             const mes = d.getMonth() + 1;
                             const anio = d.getFullYear();
-
-                            // Buscamos si tenemos este dato en la BD
                             const datoBD = cotizacionesDB.find(c => c.anio === anio && c.mes === mes);
 
-                            // Valores por defecto
                             const valDias = datoBD ? datoBD.dias_cotizados : '30';
                             const valBase = datoBD ? parseFloat(datoBD.base_cp).toFixed(2) : '0.00';
 
@@ -2669,7 +2661,7 @@
                                 </table>`;
                     };
 
-                    // 5. MOSTRAR MODAL INTERACTIVO
+                    // 4. MOSTRAR MODAL (Con campo de Vacaciones añadido)
                     const { value: formValues } = await Swal.fire({
                         title: 'Datos del Certificado',
                         width: '600px',
@@ -2680,7 +2672,7 @@
                                     <input id="swal-fecha" type="date" class="w-full border rounded p-2" value="${hoyStr}">
                                 </div>
 
-                                <div class="mb-4">
+                                <div class="mb-2">
                                     <label class="block font-semibold text-gray-700 mb-1">Causa de Extinción</label>
                                     <select id="swal-causa" class="w-full border rounded p-2 mb-2">
                                         <option value="Fin de contrato">Fin de contrato</option>
@@ -2693,9 +2685,19 @@
                                     <input id="swal-causa-manual" type="text" placeholder="Especificar causa..." class="w-full border rounded p-2 hidden">
                                 </div>
 
+                                <div class="mb-4 flex space-x-4">
+                                    <div class="w-1/2">
+                                        <label class="block font-semibold text-gray-700 mb-1">Días Vacaciones (No disfrutadas)</label>
+                                        <input id="swal-vacaciones-dias" type="number" step="1" class="w-full border rounded p-2" placeholder="0">
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label class="block font-semibold text-gray-700 mb-1">Cotización Vacaciones (€)</label>
+                                        <input id="swal-vacaciones-base" type="number" step="0.01" class="w-full border rounded p-2" placeholder="0.00">
+                                    </div>
+                                </div>
+
                                 <div class="mb-2">
                                     <p class="font-semibold text-gray-700">💰 Cotizaciones (Últimos 180 días)</p>
-                                    <p class="text-xs text-gray-500 mb-2">Edita manualmente si faltan datos en la base de datos.</p>
                                     <div id="container-tabla-cotizaciones">
                                         ${generarHtmlTabla(hoyStr)}
                                     </div>
@@ -2713,14 +2715,10 @@
                             const selectCausa = popup.querySelector('#swal-causa');
                             const manualCausa = popup.querySelector('#swal-causa-manual');
 
-                            // Recalcular tabla si cambia la fecha de baja
                             fechaInput.addEventListener('change', (e) => {
-                                if (e.target.value) {
-                                    containerTabla.innerHTML = generarHtmlTabla(e.target.value);
-                                }
+                                if (e.target.value) containerTabla.innerHTML = generarHtmlTabla(e.target.value);
                             });
 
-                            // Mostrar input manual de causa
                             selectCausa.addEventListener('change', () => {
                                 if (selectCausa.value === '_otro_') {
                                     manualCausa.classList.remove('hidden');
@@ -2735,6 +2733,8 @@
                             const fechaBaja = popup.querySelector('#swal-fecha').value;
                             const selectCausa = popup.querySelector('#swal-causa');
                             const manualCausa = popup.querySelector('#swal-causa-manual');
+                            const diasVacaciones = popup.querySelector('#swal-vacaciones-dias').value;
+                            const baseVacaciones = popup.querySelector('#swal-vacaciones-base').value;
 
                             let causa = selectCausa.value;
                             if (causa === '_otro_') causa = manualCausa.value;
@@ -2742,17 +2742,13 @@
                             if (!fechaBaja) return Swal.showValidationMessage('La fecha es obligatoria');
                             if (!causa) return Swal.showValidationMessage('La causa es obligatoria');
 
-                            // RECOLECTAR DATOS DE LA TABLA MANUAL
                             const rows = popup.querySelectorAll('#swal-table-body tr');
                             const listaCotizaciones = [];
-
                             rows.forEach(row => {
                                 const anio = row.querySelector('.swal-anio').value;
                                 const mes = row.querySelector('.swal-mes').value;
                                 const dias = row.querySelector('.swal-dias').value;
                                 const base = row.querySelector('.swal-base').value;
-
-                                // Solo añadimos si hay base o días (evitamos filas vacías si el usuario las borra)
                                 if (parseFloat(dias) > 0 || parseFloat(base) > 0) {
                                     listaCotizaciones.push({
                                         anio: parseInt(anio),
@@ -2763,13 +2759,22 @@
                                 }
                             });
 
-                            return { fechaBaja, causa, listaCotizaciones };
+                            // Pasamos los nuevos datos de vacaciones
+                            return { fechaBaja, causa, listaCotizaciones, diasVacaciones, baseVacaciones };
                         }
                     });
 
                     if (formValues) {
-                        // Llamar al generador con los datos combinados/editados
-                        generarCertificadoEmpresa(empresa, empleado, formValues.listaCotizaciones, formValues.causa, formValues.fechaBaja);
+                        // Llamamos a la función con los nuevos argumentos
+                        generarCertificadoEmpresa(
+                            empresa,
+                            empleado,
+                            formValues.listaCotizaciones,
+                            formValues.causa,
+                            formValues.fechaBaja,
+                            formValues.diasVacaciones,  // Nuevo
+                            formValues.baseVacaciones   // Nuevo
+                        );
                     }
 
                 } catch (error) {
