@@ -194,45 +194,55 @@ const extractDataFromPDF = (text) => {
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     console.log("--> Body recibido:", req.body);
-    console.log("--> Contraseña recibida:", req.body.password);
-    console.log("--> Archivo recibido:", req.file);
+    // Nota: Evita loguear contraseñas reales en producción por seguridad
+    console.log("--> Contraseña recibida:", req.body.password ? "******" : "(Vacía)");
+    console.log("--> Archivo recibido:", req.file ? "Sí" : "No");
 
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
-    const password = req.body.password || ""; // Recibimos la contraseña del frontend
+    const password = req.body.password || "";
 
     try {
-        let pdfBuffer = req.file.buffer;
+        // 1. Inicializamos el buffer con el archivo original
+        let bufferParaProcesar = req.file.buffer;
 
-        // 1. GESTIÓN DE CONTRASEÑA (Desbloquear PDF si es necesario)
+        // 2. GESTIÓN DE CONTRASEÑA (Desbloquear PDF con pdf-lib)
         try {
-            // Intentamos cargar. Si el PDF tiene pass y no lo enviamos (o es incorrecto), falla.
+            // Intentamos cargar el documento.
+            // Si está encriptado y la contraseña es correcta (o vacía si no tiene), funcionará.
             const pdfDoc = await PDFDocument.load(req.file.buffer, {
                 password: password,
                 ignoreEncryption: false
             });
 
-            // Si carga bien, guardamos una versión "limpia" (sin encriptar)
-            pdfBuffer = await pdfDoc.save();
+            // Si carga bien, guardamos una versión "limpia" (desencriptada)
+            // Sobrescribimos la variable bufferParaProcesar
+            bufferParaProcesar = await pdfDoc.save();
 
         } catch (err) {
-            console.error("Error PDF Load:", err.message); // Ver el error real en consola
+            console.error("Error PDF Load (pdf-lib):", err.message);
 
-            // Detectar si está encriptado (mensaje típico: "EncryptedPDFError")
-            if (err.message.includes('Encrypted') || err.message.includes('Password')) {
-                // Si el usuario no envió pass, pedirla
+            // Analizar el error específico de pdf-lib
+            const errorMsg = err.message || "";
+
+            // Caso A: El PDF está encriptado y no se dio contraseña o era incorrecta
+            if (errorMsg.includes('Encrypted') || errorMsg.includes('Password') || errorMsg.includes('Input document')) {
                 if (!password) {
-                    return res.status(400).json({ error: "El PDF está protegido. Por favor, introduce la contraseña." });
+                    return res.status(400).json({
+                        error: "El PDF está protegido. Por favor, introduce la contraseña.",
+                        requirePassword: true
+                    });
                 } else {
-                    // Si envió pass pero falló, es incorrecta
                     return res.status(400).json({ error: "Contraseña incorrecta." });
                 }
             }
-            // Si es otro error (ej. archivo corrupto), dejamos que continue o lanzamos error
-            throw err;
+
+            // Si el error no es de contraseña (ej. archivo corrupto), lanzamos error general
+            throw new Error("No se pudo leer el archivo PDF: " + errorMsg);
         }
 
-        // 2. LEER TEXTO (Usando el buffer desbloqueado)
+        // 3. LEER TEXTO CON PDF-PARSE
+        // Aquí usamos 'bufferParaProcesar', que ya sabemos que es legible (original o desencriptado)
         const pageTexts = [];
         const render_page = (pageData) => {
             return pageData.getTextContent({ normalizeWhitespace: false })
@@ -251,31 +261,28 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 });
         }
 
-        await pdfParse(pdfBuffer, { pagerender: render_page });
+        // ¡IMPORTANTE!: Pasamos bufferParaProcesar, NO pdfBuffer ni req.file.buffer
+        await pdfParse(bufferParaProcesar, { pagerender: render_page });
 
         const results = {
             total: pageTexts.length,
             processed: 0,
             failed: 0,
-            skipped: 0, // Nuevo contador para horarios
+            skipped: 0,
             details: []
         };
 
-        // 3. PROCESAR PÁGINAS
+        // 4. PROCESAR PÁGINAS (Extracción de datos)
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
             const pageNum = i + 1;
             const extracted = extractDataFromPDF(text);
             const lowerText = text.toLowerCase();
 
-            // A. DETECTAR SI ES UN HORARIO (Para saltarlo limpiamente)
-            // Ajusta "horario" o "calendario" según lo que aparezca realmente en el PDF
+            // A. FILTRO HORARIOS
             if (lowerText.includes('horario') || lowerText.includes('turno') || lowerText.includes('calendario laboral')) {
-                // Verificamos que NO parezca una nómina (por si acaso)
                 if (!lowerText.includes('líquido') && !lowerText.includes('percibir')) {
                     results.skipped++;
-                    // Opcional: No añadir detalle para no ensuciar el log, o añadir como 'info'
-                    // results.details.push({ page: pageNum, status: 'skipped', reason: 'Página de Horario detectada' });
                     continue;
                 }
             }
@@ -283,15 +290,13 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             // B. VALIDACIÓN DE DNI
             if (!extracted.dni) {
                 results.failed++;
-                // Solo reportamos error si hay bastante texto (evitar hojas en blanco)
                 if (text.trim().length > 50) {
-                    results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI (¿Formato ilegible?)' });
+                    results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
                 }
                 continue;
             }
 
-            // C. BUSCAR EMPLEADO (CORRECCIÓN SQL JSON)
-            // IMPORTANTE: Buscamos dentro del objeto JSON 'datos'
+            // C. BUSCAR EMPLEADO EN BD
             const empRes = await pool.query(
                 "SELECT id, datos->>'nombre' as nombre FROM empleados WHERE datos->>'dni' = $1",
                 [extracted.dni]
@@ -299,7 +304,6 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
             if (empRes.rows.length === 0) {
                 results.failed++;
-                console.log(`Fallo Pág ${pageNum}: DNI '${extracted.dni}' no existe en BD.`);
                 results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado` });
                 continue;
             }
@@ -323,7 +327,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 JSON.stringify({ origen: "importacion_pdf_lote", pagina: pageNum })
             ];
 
-            // Sobrescribir si ya existe ese mes
+            // Limpiar duplicados previos para ese mes/año/empleado
             await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
 
             await pool.query(`
@@ -343,7 +347,6 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     } catch (e) {
         console.error("Error procesando PDF:", e);
-        // Devolvemos el error limpio al frontend
         res.status(500).json({ error: e.message });
     }
 });
