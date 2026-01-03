@@ -190,67 +190,38 @@ const extractDataFromPDF = (text) => {
     return data;
 };
 
-// --- ENDPOINT: IMPORTACIÓN MASIVA (CON SOPORTE PASSWORD Y FILTRO HORARIOS) ---
-// --- ENDPOINT: IMPORTACIÓN MASIVA (CON SOPORTE PASSWORD ROBUSTO) ---
+// --- ENDPOINT: IMPORTACIÓN MASIVA (MEJORADO: GUARDA JSON COMPLETO) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
-    // 1. LIMPIEZA DE CONTRASEÑA
-    // Forzamos que sea string para evitar errores de tipo
-    let password = String(req.body.password || "").trim();
-
-    // Log de seguridad (Muestra solo longitud y primeros caracteres para depurar)
-    console.log(`--> Archivo recibido. Pass: "${password.substring(0, 2)}***" (Len: ${password.length})`);
+    // Limpieza de contraseña
+    const password = (req.body.password || "").trim();
 
     try {
-        // Variable única para el buffer (empezamos con el original encriptado)
         let bufferParaProcesar = req.file.buffer;
-        let pdfDesbloqueado = false;
 
-        // 2. INTENTO DE DESBLOQUEO CON PDF-LIB
+        // 1. DESBLOQUEO DEL PDF (Lógica Robusta)
         try {
-            // Intentamos cargar. Si tiene pass, pdf-lib intentará usarla.
             const pdfDoc = await PDFDocument.load(req.file.buffer, {
                 password: password,
-                ignoreEncryption: false // Importante: NO ignorar, queremos que falle si la pass está mal
+                ignoreEncryption: false
             });
-
-            // Si pasa de aquí, la contraseña funcionó.
-            // Guardamos el PDF "limpio" (desencriptado) para que pdf-parse pueda leerlo.
             bufferParaProcesar = await pdfDoc.save();
-            pdfDesbloqueado = true;
-            console.log("--> PDF desencriptado con éxito.");
-
         } catch (err) {
             const msg = err.message || "";
-            console.error("--> Error pdf-lib:", msg);
-
-            // DETECCIÓN PRECISA DEL ERROR DE ENCRIPTACIÓN
-            // "Input document... is encrypted" -> Es el error que te salía. Significa: "Necesito pass y la que me diste no sirvió"
             if (msg.includes('Encrypted') || msg.includes('Password') || msg.includes('Input document')) {
-
-                // Si el usuario no envió nada, le pedimos la contraseña
-                if (password.length === 0) {
-                    return res.status(400).json({
-                        error: "El archivo está protegido. Por favor, introduce la contraseña.",
-                        requirePassword: true
-                    });
-                }
-                // Si envió algo, es incorrecto
-                else {
-                    return res.status(400).json({
-                        error: "Contraseña incorrecta. Verifica mayúsculas o espacios."
-                    });
+                if (!password) {
+                    return res.status(400).json({ error: "El PDF está protegido. Introduce la contraseña.", requirePassword: true });
+                } else {
+                    return res.status(400).json({ error: "Contraseña incorrecta." });
                 }
             }
-            // Si es otro error (archivo corrupto), paramos aquí
-            return res.status(400).json({ error: "No se pudo abrir el PDF. ¿Está dañado?" });
+            throw err;
         }
 
-        // 3. EXTRACCIÓN DE TEXTO (Solo si llegamos aquí con el buffer bueno)
+        // 2. EXTRACCIÓN DE TEXTO
         const pageTexts = [];
-
         const render_page = (pageData) => {
             return pageData.getTextContent({ normalizeWhitespace: false })
                 .then(function (textContent) {
@@ -263,16 +234,13 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                         }
                         lastY = item.transform[5];
                     }
-                    pageTexts.push(text); // Guardamos texto por página
+                    pageTexts.push(text);
                     return text;
                 });
         }
 
-        // Usamos el buffer limpio
         await pdfParse(bufferParaProcesar, { pagerender: render_page });
 
-        // A partir de aquí tu lógica de extracción sigue igual...
-        // ------------------------------------------------------
         const results = {
             total: pageTexts.length,
             processed: 0,
@@ -281,13 +249,14 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             details: []
         };
 
+        // 3. PROCESAMIENTO DE PÁGINAS Y GUARDADO DE DATOS REALES
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
             const pageNum = i + 1;
-            const extracted = extractDataFromPDF(text); // Tu función extractora
+            const extracted = extractDataFromPDF(text); // Tu función extractora actual
             const lowerText = text.toLowerCase();
 
-            // A. FILTRO HORARIOS
+            // A. Filtro Horarios
             if (lowerText.includes('horario') || lowerText.includes('turno') || lowerText.includes('calendario laboral')) {
                 if (!lowerText.includes('líquido') && !lowerText.includes('percibir')) {
                     results.skipped++;
@@ -295,7 +264,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 }
             }
 
-            // B. VALIDACIÓN DE DNI
+            // B. Validación DNI
             if (!extracted.dni) {
                 results.failed++;
                 if (text.trim().length > 50) {
@@ -304,7 +273,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 continue;
             }
 
-            // C. BUSCAR EMPLEADO
+            // C. Buscar Empleado
             const empRes = await pool.query(
                 "SELECT id, datos->>'nombre' as nombre FROM empleados WHERE datos->>'dni' = $1",
                 [extracted.dni]
@@ -320,14 +289,49 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             const anio = extracted.anio || new Date().getFullYear();
             const mes = extracted.mes || (new Date().getMonth() + 1);
 
-            // D. GUARDAR (Upsert manual)
+            // Valores numéricos seguros
+            const totalDevengado = extracted.total_devengado || 0;
+            const liquido = extracted.liquido_percibir || 0;
+            const totalDeducciones = parseFloat((totalDevengado - liquido).toFixed(2));
+
+            // D. CONSTRUIR EL OBJETO "DATOS COMPLETO" PARA QUE EL VISUALIZADOR FUNCIONE
+            // Reconstruimos un objeto similar al que genera la calculadora manual
+            const nominaSimulada = {
+                salarioBasePeriodo: extracted.base_cc || 0, // Estimación visual
+                totalDevengos: totalDevengado,
+                totalDeducciones: totalDeducciones,
+                salarioNeto: liquido,
+                baseCotizacion: extracted.base_cc || 0,
+                // Campos informativos para el detalle
+                deduccionIRPF: extracted.cuota_irpf || 0,
+                porcentajeIRPF: 0, // No lo sabemos exacto desde el PDF a veces
+                otrosDevengos: [], // Se podría mejorar la extracción para rellenar esto
+                otrasDeducciones: [],
+                nota: "Importado desde PDF"
+            };
+
+            const datosCompleto = {
+                empleado: { id: empleado.id, nombre: empleado.nombre, dni: extracted.dni },
+                periodo: { mes: mes, anio: anio, inicio: `01/${mes}/${anio}`, fin: `30/${mes}/${anio}` },
+                nomina: nominaSimulada
+            };
+
+            // E. GUARDAR EN BASE DE DATOS
+            // Borrar anterior si existe
             await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
 
             const values = [
-                empleado.id, anio, mes, 30,
-                extracted.base_cc || 0, extracted.base_cp || 0, extracted.base_irpf || 0, extracted.cuota_irpf || 0,
-                extracted.total_devengado || 0, extracted.liquido_percibir || 0,
-                JSON.stringify({ origen: "importacion_pdf_lote", pagina: pageNum })
+                empleado.id,
+                anio,
+                mes,
+                30, // Días cotizados por defecto
+                extracted.base_cc || 0,
+                extracted.base_cp || 0,
+                extracted.base_irpf || 0,
+                extracted.cuota_irpf || 0,
+                totalDevengado,
+                liquido,
+                JSON.stringify(datosCompleto) // <--- ¡AQUÍ ESTÁ LA CLAVE! Guardamos el objeto rico.
             ];
 
             await pool.query(`
@@ -346,8 +350,8 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
         res.json({ success: true, summary: results });
 
     } catch (e) {
-        console.error("Error general:", e);
-        res.status(500).json({ error: "Error en el servidor: " + e.message });
+        console.error("Error procesando PDF:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
