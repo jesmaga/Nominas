@@ -5,6 +5,7 @@ const path = require('path');
 // --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
 const multer = require('multer');
 const pdfParserLib = require('pdf-parse');
+const pdfParse = pdfParserLib.default || pdfParserLib;
 const { PDFDocument } = require('pdf-lib');
 const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 require('dotenv').config();
@@ -239,7 +240,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 });
         }
 
-        await pdfParserLib(pdfBuffer, { pagerender: render_page });
+        await pdfParse(pdfBuffer, { pagerender: render_page });
 
         const results = {
             total: pageTexts.length,
