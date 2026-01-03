@@ -190,18 +190,17 @@ const extractDataFromPDF = (text) => {
     return data;
 };
 
-// --- ENDPOINT: IMPORTACIÓN MASIVA (MEJORADO: GUARDA JSON COMPLETO) ---
+// --- ENDPOINT: IMPORTACIÓN MASIVA (ESTRUCTURA IDÉNTICA A LA APP) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
-    // Limpieza de contraseña
     const password = (req.body.password || "").trim();
 
     try {
         let bufferParaProcesar = req.file.buffer;
 
-        // 1. DESBLOQUEO DEL PDF (Lógica Robusta)
+        // 1. DESBLOQUEO DEL PDF
         try {
             const pdfDoc = await PDFDocument.load(req.file.buffer, {
                 password: password,
@@ -211,11 +210,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
         } catch (err) {
             const msg = err.message || "";
             if (msg.includes('Encrypted') || msg.includes('Password') || msg.includes('Input document')) {
-                if (!password) {
-                    return res.status(400).json({ error: "El PDF está protegido. Introduce la contraseña.", requirePassword: true });
-                } else {
-                    return res.status(400).json({ error: "Contraseña incorrecta." });
-                }
+                return res.status(400).json({ error: "PDF protegido o contraseña incorrecta.", requirePassword: true });
             }
             throw err;
         }
@@ -249,11 +244,11 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             details: []
         };
 
-        // 3. PROCESAMIENTO DE PÁGINAS Y GUARDADO DE DATOS REALES
+        // 3. PROCESAMIENTO
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
             const pageNum = i + 1;
-            const extracted = extractDataFromPDF(text); // Tu función extractora actual
+            const extracted = extractDataFromPDF(text);
             const lowerText = text.toLowerCase();
 
             // A. Filtro Horarios
@@ -273,10 +268,16 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 continue;
             }
 
-            // C. Buscar Empleado
+            // C. BUSCAR EMPLEADO COMPLETO (Corrección Clave)
+            // Usamos regexp_replace para limpiar el DNI de la BD y compararlo con el limpio del PDF
+            const dniLimpio = extracted.dni.replace(/[^0-9A-Z]/gi, '');
+
+            // ¡IMPORTANTE! Ahora pedimos 'datos' entero, no solo el nombre
             const empRes = await pool.query(
-                "SELECT id, datos->>'nombre' as nombre FROM empleados WHERE datos->>'dni' = $1",
-                [extracted.dni]
+                `SELECT id, datos 
+                 FROM empleados 
+                 WHERE regexp_replace(datos->>'dni', '[^0-9A-Za-z]', '', 'g') = $1`,
+                [dniLimpio]
             );
 
             if (empRes.rows.length === 0) {
@@ -285,53 +286,104 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 continue;
             }
 
-            const empleado = empRes.rows[0];
+            const empRow = empRes.rows[0];
+            // Construimos el objeto empleado mezclando el ID de la tabla y el JSON de datos
+            // Esto asegura que tenga campos como 'puestoId', 'antiguedad', etc.
+            const empleadoCompleto = {
+                id: empRow.id,
+                ...empRow.datos
+            };
+
             const anio = extracted.anio || new Date().getFullYear();
             const mes = extracted.mes || (new Date().getMonth() + 1);
 
-            // Valores numéricos seguros
+            // Valores numéricos seguros extraídos del PDF
             const totalDevengado = extracted.total_devengado || 0;
             const liquido = extracted.liquido_percibir || 0;
+            const baseCC = extracted.base_cc || 0;
+            const baseCP = extracted.base_cp || 0;
+            const cuotaIRPF = extracted.cuota_irpf || 0;
+            const baseIRPF = extracted.base_irpf || 0;
+
+            // Cálculos inversos simples para rellenar huecos
             const totalDeducciones = parseFloat((totalDevengado - liquido).toFixed(2));
 
-            // D. CONSTRUIR EL OBJETO "DATOS COMPLETO" PARA QUE EL VISUALIZADOR FUNCIONE
-            // Reconstruimos un objeto similar al que genera la calculadora manual
-            const nominaSimulada = {
-                salarioBasePeriodo: extracted.base_cc || 0, // Estimación visual
-                totalDevengos: totalDevengado,
-                totalDeducciones: totalDeducciones,
-                salarioNeto: liquido,
-                baseCotizacion: extracted.base_cc || 0,
-                // Campos informativos para el detalle
-                deduccionIRPF: extracted.cuota_irpf || 0,
-                porcentajeIRPF: 0, // No lo sabemos exacto desde el PDF a veces
-                otrosDevengos: [], // Se podría mejorar la extracción para rellenar esto
-                otrasDeducciones: [],
-                nota: "Importado desde PDF"
-            };
+            // Estimación de cuotas SS (si no se extrajeron explícitamente, usamos porcentajes estándar para rellenar visualmente)
+            // Si el PDF no las da, al menos que no salga "undefined"
+            const dedCC = parseFloat((baseCC * 0.047).toFixed(2));
+            const dedDesempleo = parseFloat((baseCP * 0.0155).toFixed(2)); // Asumiendo general
+            const dedFP = parseFloat((baseCP * 0.001).toFixed(2));
+            const dedMEI = parseFloat((baseCP * 0.0013).toFixed(2));
 
+            // D. CONSTRUIR EL JSON "datos_completo" EXACTO
             const datosCompleto = {
-                empleado: { id: empleado.id, nombre: empleado.nombre, dni: extracted.dni },
-                periodo: { mes: mes, anio: anio, inicio: `01/${mes}/${anio}`, fin: `30/${mes}/${anio}` },
-                nomina: nominaSimulada
+                mes: mes,
+                anio: anio,
+                nomina: {
+                    // Totales Principales
+                    salarioNeto: liquido.toFixed(2),
+                    totalDevengos: totalDevengado.toFixed(2),
+                    totalDeducciones: totalDeducciones.toFixed(2),
+                    totalCoste: "0.00", // No suele venir en la nómina del trabajador
+
+                    // Bases
+                    baseCotizacion: baseCC.toFixed(2), // Usamos base CC como genérica
+                    salarioBasePeriodo: baseCC.toFixed(2), // Aproximación para visualización
+                    prorrataExtraPeriodo: "0.00",
+
+                    // Deducciones Trabajador
+                    deduccionCC: dedCC.toFixed(2),
+                    deduccionDesempleo: dedDesempleo.toFixed(2),
+                    deduccionFP: dedFP.toFixed(2),
+                    deduccionMEI: dedMEI.toFixed(2),
+                    deduccionIRPF: cuotaIRPF.toFixed(2),
+                    totalDeduccionesSS: (dedCC + dedDesempleo + dedFP + dedMEI).toFixed(2),
+
+                    // Porcentajes (Strings para que coincida con tu formato)
+                    porcCC: "4.70",
+                    porcDesempleo: "1.55",
+                    porcFP: "0.10",
+                    porcMEI: "0.13",
+                    porcentajeIRPF: baseIRPF > 0 ? ((cuotaIRPF / baseIRPF) * 100).toFixed(2) : "0.00",
+
+                    // Arrays vacíos requeridos por la app
+                    otrosDevengos: [],
+                    otrasDeducciones: [],
+                    conceptosCalculados: [], // Aquí iría el detalle si lo parseáramos línea a línea
+
+                    // Datos informativos (Rellenamos con 0 para evitar fallos)
+                    diasCotizados: 30,
+                    diasTrabajados: 30,
+                    diasBajaEnPeriodo: 0,
+
+                    // Aportaciones Empresa (Normalmente no están en el PDF del trabajador, ponemos 0)
+                    totalAportacionesEmpresa: "0.00",
+                    porcCCEmpresa: "23.60",
+                    aportacionEmpresaCC: "0.00"
+                },
+                periodo: {
+                    inicio: `${anio}-${String(mes).padStart(2, '0')}-01`,
+                    fin: `${anio}-${String(mes).padStart(2, '0')}-${new Date(anio, mes, 0).getDate()}`
+                },
+                empleado: empleadoCompleto, // ¡Esto ahora tiene TODOS los campos!
+                overwrite: false
             };
 
             // E. GUARDAR EN BASE DE DATOS
-            // Borrar anterior si existe
-            await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
+            await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empRow.id, anio, mes]);
 
             const values = [
-                empleado.id,
+                empRow.id,
                 anio,
                 mes,
-                30, // Días cotizados por defecto
-                extracted.base_cc || 0,
-                extracted.base_cp || 0,
-                extracted.base_irpf || 0,
-                extracted.cuota_irpf || 0,
+                30,
+                baseCC,
+                baseCP,
+                baseIRPF,
+                cuotaIRPF,
                 totalDevengado,
                 liquido,
-                JSON.stringify(datosCompleto) // <--- ¡AQUÍ ESTÁ LA CLAVE! Guardamos el objeto rico.
+                JSON.stringify(datosCompleto) // Guardamos la estructura perfecta
             ];
 
             await pool.query(`
@@ -344,7 +396,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             `, values);
 
             results.processed++;
-            results.details.push({ page: pageNum, status: 'success', empleado: empleado.nombre, periodo: `${mes}/${anio}` });
+            results.details.push({ page: pageNum, status: 'success', empleado: empleadoCompleto.nombre, periodo: `${mes}/${anio}` });
         }
 
         res.json({ success: true, summary: results });
