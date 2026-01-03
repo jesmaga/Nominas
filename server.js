@@ -2,12 +2,20 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 // --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
+const pdfParserLib = require('pdf-parse');
 const { PDFDocument } = require('pdf-lib');
 const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
+require('dotenv').config();
+
+// --- DIAGNÓSTICO AL ARRANCAR ---
+console.log("---------------------------------------------------");
+console.log("🛠️ DIAGNÓSTICO DE LIBRERÍAS:");
+console.log("Tipo de pdf-parse:", typeof pdfParserLib);
+console.log("Valor de pdf-parse:", pdfParserLib);
+console.log("---------------------------------------------------");
+// Si aquí sale 'undefined', la librería no está instalada correctamente.
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -231,7 +239,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 });
         }
 
-        await pdfParse(pdfBuffer, { pagerender: render_page });
+        await pdfParserLib(pdfBuffer, { pagerender: render_page });
 
         const results = {
             total: pageTexts.length,
