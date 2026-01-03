@@ -5,7 +5,7 @@ const path = require('path');
 // --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
 const multer = require('multer');
 const pdfParserLib = require('pdf-parse');
-const pdfParse = pdfParseLib.default || pdfParseLib;
+const pdfParse = pdfParserLib.default || pdfParserLib;
 const { PDFDocument } = require('pdf-lib');
 const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 require('dotenv').config();
