@@ -206,23 +206,30 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
         // 1. GESTIÓN DE CONTRASEÑA (Desbloquear PDF si es necesario)
         try {
-            // Intentamos cargar el documento. Si tiene pass, pdf-lib lanzará error si no se provee.
-            // Si el usuario envió pass, lo usamos.
+            // Intentamos cargar. Si el PDF tiene pass y no lo enviamos (o es incorrecto), falla.
             const pdfDoc = await PDFDocument.load(req.file.buffer, {
                 password: password,
                 ignoreEncryption: false
             });
-            // Guardamos el PDF ya desbloqueado en el buffer para que pdf-parse lo pueda leer
+
+            // Si carga bien, guardamos una versión "limpia" (sin encriptar)
             pdfBuffer = await pdfDoc.save();
+
         } catch (err) {
-            if (err.message.includes('Encrypted')) {
-                return res.status(400).json({ error: "El PDF está protegido. Por favor, introduce la contraseña." });
+            console.error("Error PDF Load:", err.message); // Ver el error real en consola
+
+            // Detectar si está encriptado (mensaje típico: "EncryptedPDFError")
+            if (err.message.includes('Encrypted') || err.message.includes('Password')) {
+                // Si el usuario no envió pass, pedirla
+                if (!password) {
+                    return res.status(400).json({ error: "El PDF está protegido. Por favor, introduce la contraseña." });
+                } else {
+                    // Si envió pass pero falló, es incorrecta
+                    return res.status(400).json({ error: "Contraseña incorrecta." });
+                }
             }
-            // Si la contraseña es incorrecta
-            if (err.message.includes('Password')) {
-                return res.status(400).json({ error: "Contraseña incorrecta." });
-            }
-            console.error("Error desbloqueando PDF:", err);
+            // Si es otro error (ej. archivo corrupto), dejamos que continue o lanzamos error
+            throw err;
         }
 
         // 2. LEER TEXTO (Usando el buffer desbloqueado)
