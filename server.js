@@ -3,6 +3,11 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
+// --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const { PDFDocument } = require('pdf-lib');
+const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -96,12 +101,6 @@ const initDB = async () => {
 
 // Ejecutamos la inicialización al arrancar
 initDB();
-
-// --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
-const multer = require('multer');
-const pdfParse = require('pdf-parse');
-const { PDFDocument } = require('pdf-lib');
-const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 
 // --- FUNCIÓN AYUDANTE: PARSEAR NÚMEROS ESPAÑOLES ---
 // --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
