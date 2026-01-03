@@ -1023,20 +1023,33 @@
                     </div>
                 </div>
 
-                <div class="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700 flex items-center justify-between">
-                    <div>
-                        <h4 class="text-white font-semibold mb-1">Importar Nómina (PDF)</h4>
-                        <p class="text-xs text-gray-400">Sube un PDF. El sistema leerá el DNI, bases y totales
-                            automáticamente.</p>
+                <div class="mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <div class="flex justify-between items-center mb-2">
+                        <div>
+                            <h4 class="text-white font-semibold mb-1">Importar Nómina (PDF)</h4>
+                            <p class="text-xs text-gray-400">Soporta archivos protegidos con contraseña.</p>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-3">
-                        <input type="file" id="pdf-upload-input" accept="application/pdf" class="hidden">
-                        <label for="pdf-upload-input" class="cursor-pointer btn btn-secondary">
-                            <i data-lucide="file-up" class="w-4 h-4 mr-2"></i> Seleccionar PDF
-                        </label>
-                        <button id="btn-upload-pdf-action" class="btn btn-primary hidden">
-                            <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar
-                        </button>
+
+                    <div class="flex flex-col space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <input type="file" id="pdf-upload-input" accept="application/pdf" class="hidden">
+                            <label for="pdf-upload-input" class="cursor-pointer btn btn-secondary">
+                                <i data-lucide="file-up" class="w-4 h-4 mr-2"></i> Seleccionar PDF
+                            </label>
+                            <span id="pdf-filename-display" class="text-sm text-gray-400 italic"></span>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <div class="relative w-full md:w-64">
+                                <i data-lucide="lock" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                                <input type="password" id="pdf-password-input" placeholder="Contraseña (si tiene)"
+                                    class="form-input pl-9 p-2 text-sm w-full bg-gray-900 border-gray-600">
+                            </div>
+                            <button id="btn-upload-pdf-action" class="btn btn-primary hidden">
+                                <i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -4319,19 +4332,21 @@
 
             // --- LÓGICA IMPORTAR PDF ---
             const pdfInput = document.getElementById('pdf-upload-input');
+            const pdfPasswordInput = document.getElementById('pdf-password-input');
             const btnUploadAction = document.getElementById('btn-upload-pdf-action');
+            const pdfFilenameDisplay = document.getElementById('pdf-filename-display');
 
             // Mostrar botón "Procesar" cuando se elige archivo
             if (pdfInput) {
                 pdfInput.addEventListener('change', () => {
                     if (pdfInput.files.length > 0) {
                         btnUploadAction.classList.remove('hidden');
-                        btnUploadAction.textContent = `Procesar: ${pdfInput.files[0].name}`;
+                        // Feedback visual del nombre
+                        if (pdfFilenameDisplay) pdfFilenameDisplay.textContent = pdfInput.files[0].name;
                     }
                 });
             }
 
-            // Enviar archivo al servidor
             if (btnUploadAction) {
                 btnUploadAction.addEventListener('click', async () => {
                     const file = pdfInput.files[0];
@@ -4339,8 +4354,9 @@
 
                     const formData = new FormData();
                     formData.append('nominaPdf', file);
+                    // Añadimos la contraseña al envío
+                    formData.append('password', pdfPasswordInput.value);
 
-                    // Feedback visual
                     const originalText = btnUploadAction.innerHTML;
                     btnUploadAction.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Leyendo...';
                     btnUploadAction.disabled = true;
@@ -4348,29 +4364,33 @@
                     try {
                         const response = await fetch('/api/importar-pdf', {
                             method: 'POST',
-                            body: formData // No poner Content-Type manual, fetch lo hace solo
+                            body: formData
                         });
 
                         const result = await response.json();
 
+                        if (!response.ok) {
+                            throw new Error(result.error || "Error en el servidor");
+                        }
+
                         if (result.success) {
                             const summary = result.summary;
 
-                            // Construir lista de detalles
+                            // Construir HTML de detalles
                             let htmlDetails = '<div class="text-left text-sm mt-2 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50">';
 
-                            if (summary.details.length === 0 && summary.total > 0) {
-                                htmlDetails += '<p class="text-gray-500">No se detectaron nóminas válidas en las páginas analizadas.</p>';
+                            if (summary.skipped > 0) {
+                                htmlDetails += `<p class="text-blue-500 text-xs mb-2">ℹ️ Se omitieron ${summary.skipped} páginas de Horarios.</p>`;
                             }
 
                             summary.details.forEach(det => {
                                 if (det.status === 'success') {
-                                    htmlDetails += `<div class="text-green-700 border-b border-gray-200 py-1">
-                                        ✅ <b>Pág ${det.page}:</b> ${det.empleado} (${det.periodo})
+                                    htmlDetails += `<div class="text-green-700 border-b border-gray-200 py-1 flex items-center">
+                                        <i data-lucide="check" class="w-3 h-3 mr-1"></i> <b>Pág ${det.page}:</b> ${det.empleado}
                                     </div>`;
                                 } else {
-                                    htmlDetails += `<div class="text-red-600 border-b border-gray-200 py-1">
-                                        ❌ <b>Pág ${det.page}:</b> ${det.reason}
+                                    htmlDetails += `<div class="text-red-600 border-b border-gray-200 py-1 flex items-center">
+                                        <i data-lucide="x" class="w-3 h-3 mr-1"></i> <b>Pág ${det.page}:</b> ${det.reason}
                                     </div>`;
                                 }
                             });
@@ -4379,10 +4399,10 @@
                             Swal.fire({
                                 title: 'Proceso Finalizado',
                                 html: `
-                                    <p class="mb-2">Se analizaron <b>${summary.total}</b> páginas.</p>
-                                    <div class="flex justify-around mb-2 font-bold">
-                                        <span class="text-green-600">Importadas: ${summary.processed}</span>
-                                        <span class="text-red-600">Fallidas: ${summary.failed}</span>
+                                    <div class="grid grid-cols-3 gap-2 mb-2 font-bold text-center">
+                                        <div class="text-green-600 bg-green-100 rounded p-1">Importadas<br>${summary.processed}</div>
+                                        <div class="text-blue-600 bg-blue-100 rounded p-1">Horarios<br>${summary.skipped}</div>
+                                        <div class="text-red-600 bg-red-100 rounded p-1">Fallidas<br>${summary.failed}</div>
                                     </div>
                                     ${htmlDetails}
                                 `,
@@ -4390,18 +4410,19 @@
                                 width: '600px'
                             });
 
-                            // Recargar historial
                             if (typeof renderHistorial === 'function') renderHistorial();
 
-                            // Limpiar input
+                            // Limpiar inputs
                             pdfInput.value = '';
+                            pdfPasswordInput.value = '';
+                            if (pdfFilenameDisplay) pdfFilenameDisplay.textContent = '';
                             btnUploadAction.classList.add('hidden');
                         }
                     } catch (error) {
                         console.error(error);
                         Swal.fire('Error', error.message, 'error');
                     } finally {
-                        btnUploadAction.innerHTML = '<i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Procesar';
+                        btnUploadAction.innerHTML = originalText;
                         btnUploadAction.disabled = false;
                         lucide.createIcons();
                     }

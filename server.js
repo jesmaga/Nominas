@@ -100,6 +100,7 @@ initDB();
 // --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
+const { PDFDocument } = require('pdf-lib');
 const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 
 // --- FUNCIÓN AYUDANTE: PARSEAR NÚMEROS ESPAÑOLES ---
@@ -126,9 +127,15 @@ const extractDataFromPDF = (text) => {
     const rawText = text;
     const lowerText = text.toLowerCase();
 
-    // 1. DNI (Busca 8 dígitos + letra, con o sin guión)
-    const dniMatch = rawText.match(/\b(\d{8})[- ]?([A-Z])\b/i);
-    if (dniMatch) data.dni = dniMatch[1] + dniMatch[2].toUpperCase();
+    // 1. DNI (Busca 8 dígitos + letra, con o sin guión ignorando espacios extra)
+    // Limpiamos el texto de espacios excesivos para facilitar la búsqueda
+    const cleanText = rawText.replace(/\s+/g, ' ');
+    const dniMatch = cleanText.match(/\b(\d{8})[- ]?([A-Z])\b/i);
+
+    if (dniMatch) {
+        // Formateamos el DNI sin guiones y en mayúsculas para que coincida con lo guardado en BD
+        data.dni = (dniMatch[1] + dniMatch[2]).toUpperCase();
+    }
 
     // 2. FECHA (Texto o Numérica)
     const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -176,12 +183,37 @@ const extractDataFromPDF = (text) => {
     return data;
 };
 
-// --- ENDPOINT: IMPORTACIÓN MASIVA (PÁGINA A PÁGINA) ---
+// --- ENDPOINT: IMPORTACIÓN MASIVA (CON SOPORTE PASSWORD Y FILTRO HORARIOS) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
+    const password = req.body.password || ""; // Recibimos la contraseña del frontend
+
     try {
-        // A. Separar el PDF en páginas individuales
+        let pdfBuffer = req.file.buffer;
+
+        // 1. GESTIÓN DE CONTRASEÑA (Desbloquear PDF si es necesario)
+        try {
+            // Intentamos cargar el documento. Si tiene pass, pdf-lib lanzará error si no se provee.
+            // Si el usuario envió pass, lo usamos.
+            const pdfDoc = await PDFDocument.load(req.file.buffer, {
+                password: password,
+                ignoreEncryption: false
+            });
+            // Guardamos el PDF ya desbloqueado en el buffer para que pdf-parse lo pueda leer
+            pdfBuffer = await pdfDoc.save();
+        } catch (err) {
+            if (err.message.includes('Encrypted')) {
+                return res.status(400).json({ error: "El PDF está protegido. Por favor, introduce la contraseña." });
+            }
+            // Si la contraseña es incorrecta
+            if (err.message.includes('Password')) {
+                return res.status(400).json({ error: "Contraseña incorrecta." });
+            }
+            console.error("Error desbloqueando PDF:", err);
+        }
+
+        // 2. LEER TEXTO (Usando el buffer desbloqueado)
         const pageTexts = [];
         const render_page = (pageData) => {
             return pageData.getTextContent({ normalizeWhitespace: false })
@@ -195,48 +227,61 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                         }
                         lastY = item.transform[5];
                     }
-                    // Guardamos el texto de ESTA página en el array
                     pageTexts.push(text);
                     return text;
                 });
         }
 
-        // Ejecutar lectura
-        await pdfParse(req.file.buffer, { pagerender: render_page });
-
-        console.log(`--> PDF procesado. Páginas encontradas: ${pageTexts.length}`);
+        await pdfParse(pdfBuffer, { pagerender: render_page });
 
         const results = {
             total: pageTexts.length,
             processed: 0,
             failed: 0,
+            skipped: 0, // Nuevo contador para horarios
             details: []
         };
 
-        // B. Procesar cada página como una nómina independiente
+        // 3. PROCESAR PÁGINAS
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
             const pageNum = i + 1;
-
-            // 1. Extraer datos
             const extracted = extractDataFromPDF(text);
+            const lowerText = text.toLowerCase();
 
-            // 2. Validación mínima: ¿Tiene DNI?
+            // A. DETECTAR SI ES UN HORARIO (Para saltarlo limpiamente)
+            // Ajusta "horario" o "calendario" según lo que aparezca realmente en el PDF
+            if (lowerText.includes('horario') || lowerText.includes('turno') || lowerText.includes('calendario laboral')) {
+                // Verificamos que NO parezca una nómina (por si acaso)
+                if (!lowerText.includes('líquido') && !lowerText.includes('percibir')) {
+                    results.skipped++;
+                    // Opcional: No añadir detalle para no ensuciar el log, o añadir como 'info'
+                    // results.details.push({ page: pageNum, status: 'skipped', reason: 'Página de Horario detectada' });
+                    continue;
+                }
+            }
+
+            // B. VALIDACIÓN DE DNI
             if (!extracted.dni) {
                 results.failed++;
-                // Solo reportamos error si la página tiene algo de texto (ignorar páginas en blanco)
+                // Solo reportamos error si hay bastante texto (evitar hojas en blanco)
                 if (text.trim().length > 50) {
-                    results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
+                    results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI (¿Formato ilegible?)' });
                 }
                 continue;
             }
 
-            // 3. Buscar Empleado
-            const empRes = await pool.query("SELECT id, nombre FROM empleados WHERE dni = $1", [extracted.dni]);
+            // C. BUSCAR EMPLEADO (CORRECCIÓN SQL JSON)
+            // IMPORTANTE: Buscamos dentro del objeto JSON 'datos'
+            const empRes = await pool.query(
+                "SELECT id, datos->>'nombre' as nombre FROM empleados WHERE datos->>'dni' = $1",
+                [extracted.dni]
+            );
 
             if (empRes.rows.length === 0) {
                 results.failed++;
-                results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado en sistema` });
+                console.log(`Fallo Pág ${pageNum}: DNI '${extracted.dni}' no existe en BD.`);
+                results.details.push({ page: pageNum, status: 'error', reason: `DNI ${extracted.dni} no registrado` });
                 continue;
             }
 
@@ -244,12 +289,12 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             const anio = extracted.anio || new Date().getFullYear();
             const mes = extracted.mes || (new Date().getMonth() + 1);
 
-            // 4. Guardar en BD
+            // D. GUARDAR EN BD
             const values = [
                 empleado.id,
                 anio,
                 mes,
-                30, // Días por defecto
+                30,
                 extracted.base_cc || 0,
                 extracted.base_cp || 0,
                 extracted.base_irpf || 0,
@@ -259,7 +304,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 JSON.stringify({ origen: "importacion_pdf_lote", pagina: pageNum })
             ];
 
-            // Borrar anterior si existe (sobrescribir)
+            // Sobrescribir si ya existe ese mes
             await pool.query("DELETE FROM nominas WHERE empleado_id = $1 AND anio = $2 AND mes = $3", [empleado.id, anio, mes]);
 
             await pool.query(`
@@ -279,7 +324,8 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
     } catch (e) {
         console.error("Error procesando PDF:", e);
-        res.status(500).json({ error: "Error crítico: " + e.message });
+        // Devolvemos el error limpio al frontend
+        res.status(500).json({ error: e.message });
     }
 });
 
