@@ -13,8 +13,8 @@ require('dotenv').config();
 // --- DIAGNÓSTICO AL ARRANCAR ---
 console.log("---------------------------------------------------");
 console.log("🛠️ DIAGNÓSTICO DE LIBRERÍAS:");
-console.log("Tipo de pdf-parse:", typeof pdfParserLib);
-console.log("Valor de pdf-parse:", pdfParserLib);
+console.log("Tipo de pdf-parse:", typeof pdfParseLib);
+console.log("Valor de pdf-parse:", pdfParseLib);
 console.log("---------------------------------------------------");
 // Si aquí sale 'undefined', la librería no está instalada correctamente.
 
