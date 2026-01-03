@@ -193,14 +193,15 @@ const extractDataFromPDF = (text) => {
 // --- ENDPOINT: IMPORTACIÓN MASIVA (CON SOPORTE PASSWORD Y FILTRO HORARIOS) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
-    console.log("--> Body recibido:", req.body);
-    // Nota: Evita loguear contraseñas reales en producción por seguridad
-    console.log("--> Contraseña recibida:", req.body.password ? "******" : "(Vacía)");
-    console.log("--> Archivo recibido:", req.file ? "Sí" : "No");
-
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
-    const password = req.body.password || "";
+    // .trim() elimina espacios en blanco al inicio y final
+    const password = (req.body.password || "").trim();
+
+    // --- BLOQUE DE DEPURACIÓN ---
+    console.log("------------------------------------------------");
+    console.log(`Pass recibida: "${password}" | Longitud: ${password.length}`);
+    console.log("------------------------------------------------");
 
     try {
         // 1. Inicializamos el buffer con el archivo original
@@ -208,42 +209,40 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
 
         // 2. GESTIÓN DE CONTRASEÑA (Desbloquear PDF con pdf-lib)
         try {
-            // Intentamos cargar el documento.
-            // Si está encriptado y la contraseña es correcta (o vacía si no tiene), funcionará.
             const pdfDoc = await PDFDocument.load(req.file.buffer, {
                 password: password,
                 ignoreEncryption: false
             });
 
-            // Si carga bien, guardamos una versión "limpia" (desencriptada)
-            // Sobrescribimos la variable bufferParaProcesar
+            // ¡Éxito! Guardamos el PDF limpio (desencriptado)
             bufferParaProcesar = await pdfDoc.save();
+            console.log("--> PDF desbloqueado correctamente.");
 
         } catch (err) {
-            console.error("Error PDF Load (pdf-lib):", err.message);
-
-            // Analizar el error específico de pdf-lib
             const errorMsg = err.message || "";
+            console.error("--> Fallo al abrir PDF (pdf-lib):", errorMsg);
 
-            // Caso A: El PDF está encriptado y no se dio contraseña o era incorrecta
+            // Caso A: PDF Encriptado (Contraseña incorrecta o faltante)
             if (errorMsg.includes('Encrypted') || errorMsg.includes('Password') || errorMsg.includes('Input document')) {
                 if (!password) {
                     return res.status(400).json({
-                        error: "El PDF está protegido. Por favor, introduce la contraseña.",
+                        error: "El PDF está protegido. Introduce la contraseña.",
                         requirePassword: true
                     });
                 } else {
-                    return res.status(400).json({ error: "Contraseña incorrecta." });
+                    return res.status(400).json({
+                        error: `Contraseña incorrecta.`
+                    });
                 }
             }
-
-            // Si el error no es de contraseña (ej. archivo corrupto), lanzamos error general
-            throw new Error("No se pudo leer el archivo PDF: " + errorMsg);
+            // Si es otro error, lo lanzamos para que lo capture el catch general
+            throw err;
         }
 
         // 3. LEER TEXTO CON PDF-PARSE
-        // Aquí usamos 'bufferParaProcesar', que ya sabemos que es legible (original o desencriptado)
+        // Definimos el array AQUÍ para poder usarlo después
         const pageTexts = [];
+
         const render_page = (pageData) => {
             return pageData.getTextContent({ normalizeWhitespace: false })
                 .then(function (textContent) {
@@ -256,13 +255,16 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                         }
                         lastY = item.transform[5];
                     }
+                    // ¡IMPORTANTE! Guardamos el texto de ESTA página en el array
                     pageTexts.push(text);
                     return text;
                 });
         }
 
-        // ¡IMPORTANTE!: Pasamos bufferParaProcesar, NO pdfBuffer ni req.file.buffer
+        // Importante: pasar bufferParaProcesar (que puede ser el original o el desbloqueado)
         await pdfParse(bufferParaProcesar, { pagerender: render_page });
+
+        // A partir de aquí, 'pageTexts' ya tiene el texto de cada página
 
         const results = {
             total: pageTexts.length,
@@ -290,6 +292,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
             // B. VALIDACIÓN DE DNI
             if (!extracted.dni) {
                 results.failed++;
+                // Solo reportamos error si hay bastante texto
                 if (text.trim().length > 50) {
                     results.details.push({ page: pageNum, status: 'error', reason: 'No se encontró DNI' });
                 }
