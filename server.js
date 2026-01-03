@@ -240,7 +240,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 });
         }
 
-        await pdfParse(pdfBuffer, { pagerender: render_page });
+        await pdfParserLib(pdfBuffer, { pagerender: render_page });
 
         const results = {
             total: pageTexts.length,
