@@ -4,8 +4,7 @@ const cors = require('cors');
 const path = require('path');
 // --- NUEVAS IMPORTACIONES AL INICIO DEL ARCHIVO ---
 const multer = require('multer');
-const pdfParseLib = require('pdf-parse');
-const pdfParse = pdfParseLib.default || pdfParseLib;
+const pdfParse = require('pdf-parse');
 const { PDFDocument } = require('pdf-lib');
 const upload = multer({ storage: multer.memoryStorage() }); // Guardamos en memoria RAM temporalmente
 require('dotenv').config();
@@ -13,8 +12,8 @@ require('dotenv').config();
 // --- DIAGNÓSTICO AL ARRANCAR ---
 console.log("---------------------------------------------------");
 console.log("🛠️ DIAGNÓSTICO DE LIBRERÍAS:");
-console.log("Tipo de pdf-parse:", typeof pdfParseLib);
-console.log("Valor de pdf-parse:", pdfParseLib);
+console.log("Tipo de pdf-parse:", typeof pdfParse);
+console.log("Valor de pdf-parse:", pdfParse);
 console.log("---------------------------------------------------");
 // Si aquí sale 'undefined', la librería no está instalada correctamente.
 
