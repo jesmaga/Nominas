@@ -192,6 +192,11 @@ const extractDataFromPDF = (text) => {
 
 // --- ENDPOINT: IMPORTACIÓN MASIVA (CON SOPORTE PASSWORD Y FILTRO HORARIOS) ---
 app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
+
+    console.log("--> Body recibido:", req.body);
+    console.log("--> Contraseña recibida:", req.body.password);
+    console.log("--> Archivo recibido:", req.file);
+
     if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo." });
 
     const password = req.body.password || ""; // Recibimos la contraseña del frontend

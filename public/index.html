@@ -4353,9 +4353,9 @@
                     if (!file) return;
 
                     const formData = new FormData();
-                    formData.append('nominaPdf', file);
                     // Añadimos la contraseña al envío
                     formData.append('password', pdfPasswordInput.value);
+                    formData.append('nominaPdf', file);
 
                     const originalText = btnUploadAction.innerHTML;
                     btnUploadAction.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Leyendo...';
