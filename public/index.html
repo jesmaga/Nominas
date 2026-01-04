@@ -1546,7 +1546,8 @@
                 const tabUsuarios = document.getElementById('tab-admin-usuarios');
                 if (tabUsuarios) {
                     const loggedInUser = sessionStorage.getItem('loggedInUser');
-                    if (targetId === 'admin' && loggedInUser === 'admin') {
+                    const currentRole = sessionStorage.getItem('userRole');
+                    if (targetId === 'admin' && currentRole === 'admin') {
                         tabUsuarios.classList.remove('hidden');
                     } else {
                         tabUsuarios.classList.add('hidden');
