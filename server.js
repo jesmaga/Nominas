@@ -128,7 +128,7 @@ const parseSpanishNumber = (str) => {
     return isNaN(num) ? 0 : num;
 };
 
-// --- EXTRACTOR DE DATOS BLINDADO (Ignora fórmulas como 1+2) ---
+// --- EXTRACTOR DE DATOS BLINDADO (Corregido: mesRegex) ---
 const extractDataFromPDF = (text) => {
     const data = {};
 
@@ -140,10 +140,13 @@ const extractDataFromPDF = (text) => {
     // El patrón .*? salta cualquier cosa (incluido "(1 + 2)") hasta llegar al importe
     const extractCurrency = (labelRegex) => {
         // Construimos una regex dinámica: Etiqueta + cualquier cosa + (NUMERO,DECIMALES)
-        // Ejemplo generado: /TOTAL\s+DEVENGADO.*?(\d+(?:\.\d+)*,\d{2})/i
-        const fullRegex = new RegExp(labelRegex.source + ".*?(\\d+(?:\\.\\d+)*,\\d{2})", "i");
-        const match = cleanText.match(fullRegex);
-        return match ? parseSpanishNumber(match[1]) : 0;
+        try {
+            const fullRegex = new RegExp(labelRegex.source + ".*?(\\d+(?:\\.\\d+)*,\\d{2})", "i");
+            const match = cleanText.match(fullRegex);
+            return match ? parseSpanishNumber(match[1]) : 0;
+        } catch (e) {
+            return 0;
+        }
     };
 
     // 2. EXTRACCIONES CLAVE
@@ -156,8 +159,10 @@ const extractDataFromPDF = (text) => {
     const anioMatch = cleanText.match(/\b(20\d{2})\b/);
     if (anioMatch) data.anio = parseInt(anioMatch[1]);
 
+    // --- CORRECCIÓN AQUÍ: Definimos mesesRegex y lo usamos correctamente ---
     const mesesRegex = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
-    const mesMatch = cleanText.match(mesRegex);
+    const mesMatch = cleanText.match(mesesRegex);
+
     if (mesMatch) {
         const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
         data.mes = meses.indexOf(mesMatch[0].toLowerCase()) + 1;
@@ -165,7 +170,8 @@ const extractDataFromPDF = (text) => {
         const fechaNum = cleanText.match(/\d{2}\/(\d{2})\/(20\d{2})/);
         if (fechaNum) {
             data.mes = parseInt(fechaNum[1]);
-            data.anio = parseInt(fechaNum[2]);
+            // Si no pillamos año antes, lo pillamos de aquí
+            if (!data.anio) data.anio = parseInt(fechaNum[2]);
         }
     }
 
@@ -180,7 +186,7 @@ const extractDataFromPDF = (text) => {
     data.liquido_percibir = extractCurrency(/L[IÍ]QUIDO\s+TOTAL/);
 
     // Bases de Cotización
-    // Priorizamos "Remuneración mensual" que aparece justo antes de la tabla de bases
+    // Priorizamos "Remuneración mensual" que aparece justo antes de la tabla de bases en tu PDF
     data.base_cc = extractCurrency(/Remuneraci[oó]n\s+mensual/);
 
     // Si falla, intentamos buscar por "Base Contingencias Comunes"
@@ -199,7 +205,6 @@ const extractDataFromPDF = (text) => {
     const posibleCuotaIRPF = extractCurrency(/Impuesto\s+sobre\s+la\s+renta/);
 
     // Validación de seguridad: La cuota no puede ser mayor que la base.
-    // Si captura un número gigante, es que ha pillado la base por error.
     if (posibleCuotaIRPF > 0 && posibleCuotaIRPF < (data.total_devengado * 0.5)) {
         data.cuota_irpf = posibleCuotaIRPF;
     } else {
