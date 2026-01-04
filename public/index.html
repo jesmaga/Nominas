@@ -425,21 +425,61 @@
                     </form>
                 </div>
                 <div class="md:col-span-2 content-card">
-                    <h3 class="text-xl font-semibold text-white mb-4">Lista de Empleados</h3>
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                        <h3 class="text-xl font-semibold text-white">Lista de Empleados</h3>
+
+                        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                            <div class="relative">
+                                <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                                <input type="text" id="empleados-search" placeholder="Buscar nombre, DNI..."
+                                    class="form-input pl-9 p-2 text-sm w-full md:w-48">
+                            </div>
+                            <select id="empleados-rows-per-page" class="form-input p-2 text-sm w-20">
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="overflow-x-auto">
                         <table id="lista-empleados" class="w-full data-table">
                             <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Puesto</th>
-                                    <th>Tipo de Contrato</th>
-                                    <th>DNI</th>
+                                <tr class="text-gray-400 select-none">
+                                    <th class="cursor-pointer hover:text-white sort-header-emp" data-key="nombre">
+                                        <div class="flex items-center">Nombre <i data-lucide="arrow-up-down"
+                                                class="w-3 h-3 ml-2"></i></div>
+                                    </th>
+                                    <th class="cursor-pointer hover:text-white sort-header-emp"
+                                        data-key="_puestoNombre">
+                                        <div class="flex items-center">Puesto <i data-lucide="arrow-up-down"
+                                                class="w-3 h-3 ml-2"></i></div>
+                                    </th>
+                                    <th>Tipo Contrato</th>
+                                    <th class="cursor-pointer hover:text-white sort-header-emp" data-key="dni">
+                                        <div class="flex items-center">DNI <i data-lucide="arrow-up-down"
+                                                class="w-3 h-3 ml-2"></i></div>
+                                    </th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="lista-empleados-body">
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
+                        <span class="text-sm text-gray-400" id="empleados-pagination-info">Mostrando 0 de 0</span>
+                        <div class="flex space-x-2">
+                            <button id="btn-prev-page-emp"
+                                class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <button id="btn-next-page-emp"
+                                class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1876,79 +1916,220 @@
             };
 
             // ==========================================================
-            // --- LÓGICA DE EMPLEADOS ---
+            // --- LÓGICA AVANZADA DE EMPLEADOS (Estado, Filtros, Paginación) ---
             // ==========================================================
+
+            let empleadosState = {
+                rawData: [],
+                filteredData: [],
+                currentPage: 1,
+                rowsPerPage: 10,
+                sortKey: 'nombre',
+                sortAsc: true,
+                searchTerm: ''
+            };
+
+            // Referencias DOM Empleados
+            const tablaEmpleadosBody = document.getElementById('lista-empleados-body');
+            const searchInputEmp = document.getElementById('empleados-search');
+            const rowsPerPageSelectEmp = document.getElementById('empleados-rows-per-page');
+            const btnPrevPageEmp = document.getElementById('btn-prev-page-emp');
+            const btnNextPageEmp = document.getElementById('btn-next-page-emp');
+            const paginationInfoEmp = document.getElementById('empleados-pagination-info');
+            const sortHeadersEmp = document.querySelectorAll('.sort-header-emp');
+
+            // 1. Cargar datos en el estado (Sustituye a tu antiguo renderEmpleados)
             const renderEmpleados = () => {
-                listaEmpleados.innerHTML = '';
-                if (empleados.length === 0) {
-                    listaEmpleados.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">No hay empleados registrados.</td></tr>';
-                    return;
-                }
-                empleados.forEach(empleado => {
-                    const puesto = puestos.find(p => p.id === empleado.puestoId) || { nombre: 'N/A' };
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                <td>${empleado.nombre}</td>
-                <td>${puesto.nombre}</td>
-                <td>${empleado.tipoContrato || 'N/A'}<td>${empleado.dni}</td>
-                <td class="flex space-x-2">
-                    <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')" title="Editar"><i data-lucide="edit" class="w-5 h-5"></i></button>
-                    <button class="p-2 text-green-500 hover:text-green-300" onclick="app.generarCertificado('${empleado.id}')" title="Certificado Empresa"><i data-lucide="file-text" class="w-5 h-5"></i></button>
-                    <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')" title="Borrar"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                </td>
-            `;
-                    listaEmpleados.appendChild(tr);
+                if (!tablaEmpleadosBody) return;
+
+                // Pre-procesamos los datos para facilitar ordenación por nombre de puesto
+                empleadosState.rawData = empleados.map(emp => {
+                    const puesto = puestos.find(p => p.id === emp.puestoId) || { nombre: 'N/A' };
+                    return {
+                        ...emp,
+                        _puestoNombre: puesto.nombre, // Dato auxiliar para ordenar/buscar
+                        _searchString: `${emp.nombre} ${emp.dni} ${puesto.nombre}`.toLowerCase()
+                    };
                 });
+
+                applyEmpleadosFilters();
+            };
+
+            // 2. Aplicar Filtros y Orden
+            const applyEmpleadosFilters = () => {
+                let data = [...empleadosState.rawData];
+
+                // Búsqueda
+                if (empleadosState.searchTerm) {
+                    const term = empleadosState.searchTerm.toLowerCase();
+                    data = data.filter(item => item._searchString.includes(term));
+                }
+
+                // Ordenación
+                data.sort((a, b) => {
+                    let valA = a[empleadosState.sortKey];
+                    let valB = b[empleadosState.sortKey];
+
+                    valA = String(valA || '').toLowerCase();
+                    valB = String(valB || '').toLowerCase();
+
+                    if (valA < valB) return empleadosState.sortAsc ? -1 : 1;
+                    if (valA > valB) return empleadosState.sortAsc ? 1 : -1;
+                    return 0;
+                });
+
+                empleadosState.filteredData = data;
+                // Si al filtrar hay menos páginas, reseteamos a la 1
+                const maxPage = Math.ceil(data.length / empleadosState.rowsPerPage) || 1;
+                if (empleadosState.currentPage > maxPage) empleadosState.currentPage = 1;
+
+                updateEmpleadosTableUI();
+            };
+
+            // 3. Renderizar Tabla y Paginación
+            const updateEmpleadosTableUI = () => {
+                const { filteredData, currentPage, rowsPerPage } = empleadosState;
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                const pageData = filteredData.slice(start, end);
+
+                tablaEmpleadosBody.innerHTML = '';
+
+                if (pageData.length === 0) {
+                    tablaEmpleadosBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">No se encontraron empleados.</td></tr>';
+                } else {
+                    pageData.forEach(empleado => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${empleado.nombre}</td>
+                            <td>${empleado._puestoNombre}</td>
+                            <td>${empleado.tipoContrato || 'N/A'}</td>
+                            <td>${empleado.dni}</td>
+                            <td class="flex space-x-2">
+                                <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')" title="Editar"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                                <button class="p-2 text-green-500 hover:text-green-300" onclick="app.generarCertificado('${empleado.id}')" title="Certificado Empresa"><i data-lucide="file-text" class="w-5 h-5"></i></button>
+                                <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')" title="Borrar"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                            </td>
+                        `;
+                        tablaEmpleadosBody.appendChild(tr);
+                    });
+                }
+
+                // Actualizar info paginación
+                const total = filteredData.length;
+                paginationInfoEmp.textContent = total > 0
+                    ? `Mostrando ${start + 1} a ${Math.min(end, total)} de ${total}`
+                    : '0 empleados';
+
+                btnPrevPageEmp.disabled = currentPage === 1;
+                btnNextPageEmp.disabled = end >= total;
+
                 lucide.createIcons();
             };
+
+            // 4. Listeners (Buscador, Paginación, Orden)
+            if (searchInputEmp) {
+                searchInputEmp.addEventListener('input', (e) => {
+                    empleadosState.searchTerm = e.target.value;
+                    applyEmpleadosFilters();
+                });
+            }
+
+            if (rowsPerPageSelectEmp) {
+                rowsPerPageSelectEmp.addEventListener('change', (e) => {
+                    empleadosState.rowsPerPage = parseInt(e.target.value);
+                    empleadosState.currentPage = 1;
+                    applyEmpleadosFilters();
+                });
+            }
+
+            if (btnPrevPageEmp) {
+                btnPrevPageEmp.addEventListener('click', () => {
+                    if (empleadosState.currentPage > 1) {
+                        empleadosState.currentPage--;
+                        updateEmpleadosTableUI();
+                    }
+                });
+            }
+
+            if (btnNextPageEmp) {
+                btnNextPageEmp.addEventListener('click', () => {
+                    const maxPage = Math.ceil(empleadosState.filteredData.length / empleadosState.rowsPerPage);
+                    if (empleadosState.currentPage < maxPage) {
+                        empleadosState.currentPage++;
+                        updateEmpleadosTableUI();
+                    }
+                });
+            }
+
+            // Headers de ordenación
+            sortHeadersEmp.forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.dataset.key;
+                    if (empleadosState.sortKey === key) {
+                        empleadosState.sortAsc = !empleadosState.sortAsc;
+                    } else {
+                        empleadosState.sortKey = key;
+                        empleadosState.sortAsc = true;
+                    }
+
+                    // Resetear colores iconos
+                    sortHeadersEmp.forEach(h => h.classList.remove('text-blue-400'));
+                    th.classList.add('text-blue-400');
+
+                    applyEmpleadosFilters();
+                });
+            });
             const resetFormEmpleado = () => {
                 formEmpleado.reset();
                 empleadoIdInput.value = '';
-                // Resetear campos manuales explícitamente si es necesario, aunque form.reset() debería bastar
-                // Aseguramos valores por defecto
+
+                // Resetear campos manuales explícitamente
                 document.getElementById('empleado-hijos').value = "0";
                 document.getElementById('empleado-ascendientes').value = "0";
 
                 formEmpleadoTitulo.textContent = 'Añadir Nuevo Empleado';
                 cancelarEdicionEmpleadoBtn.classList.add('hidden');
+
+                // FUERZA EL RESET DEL BOTÓN
+                const submitBtn = formEmpleado.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.textContent = "Guardar Empleado";
+                    submitBtn.disabled = false;
+                }
             };
 
             // --- LÓGICA DE GUARDADO DE EMPLEADOS EN BASE DE DATOS ---
             formEmpleado.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
-                // 1. Capturamos el ID (si existe es edición, si no es nuevo)
-                const id = empleadoIdInput.value;
+                const submitBtn = formEmpleado.querySelector('button[type="submit"]');
+                const originalText = "Guardar Empleado"; // Fijamos el texto base
 
-                // Si no tiene ID, generamos uno nuevo basado en la fecha
-                const finalId = id || `e_${Date.now()}`;
+                // Bloqueo visual
+                submitBtn.textContent = "Guardando...";
+                submitBtn.disabled = true;
 
-                // 2. Recopilamos los datos del formulario
-                const empleadoData = {
-                    id: finalId,
-                    nombre: document.getElementById('empleado-nombre').value,
-                    puestoId: document.getElementById('empleado-puesto').value,
-                    horas: document.getElementById('empleado-horas').value,
-                    tipoContrato: document.getElementById('empleado-tipo-contrato').value,
-                    dni: document.getElementById('empleado-dni').value,
-                    ss: document.getElementById('empleado-ss').value,
-                    antiguedad: document.getElementById('empleado-antiguedad').value,
-                    cotizacion: document.getElementById('empleado-cotizacion').value,
-                    // Datos Fiscales
-                    estadoCivil: document.getElementById('empleado-estado-civil').value,
-                    anioNacimiento: document.getElementById('empleado-anio-nacimiento').value,
-                    discapacidad: document.getElementById('empleado-discapacidad').value,
-                    hijos: document.getElementById('empleado-hijos').value,
-                    ascendientes: document.getElementById('empleado-ascendientes').value
-                };
-
-                // 3. Enviamos al Servidor (Render -> Neon)
                 try {
-                    // Bloqueamos el botón o mostramos carga (opcional pero recomendado)
-                    const submitBtn = formEmpleado.querySelector('button[type="submit"]');
-                    const originalText = submitBtn.textContent;
-                    submitBtn.textContent = "Guardando...";
-                    submitBtn.disabled = true;
+                    const id = empleadoIdInput.value;
+                    const finalId = id || `e_${Date.now()}`;
+
+                    const empleadoData = {
+                        id: finalId,
+                        nombre: document.getElementById('empleado-nombre').value,
+                        puestoId: document.getElementById('empleado-puesto').value,
+                        horas: document.getElementById('empleado-horas').value,
+                        tipoContrato: document.getElementById('empleado-tipo-contrato').value,
+                        dni: document.getElementById('empleado-dni').value,
+                        ss: document.getElementById('empleado-ss').value,
+                        antiguedad: document.getElementById('empleado-antiguedad').value,
+                        cotizacion: document.getElementById('empleado-cotizacion').value,
+                        estadoCivil: document.getElementById('empleado-estado-civil').value,
+                        anioNacimiento: document.getElementById('empleado-anio-nacimiento').value,
+                        discapacidad: document.getElementById('empleado-discapacidad').value,
+                        hijos: document.getElementById('empleado-hijos').value,
+                        ascendientes: document.getElementById('empleado-ascendientes').value
+                    };
 
                     const response = await fetch('/api/empleados', {
                         method: 'POST',
@@ -1959,33 +2140,21 @@
                     const result = await response.json();
 
                     if (result.success) {
-                        // 4. Si todo va bien: Recargamos datos y limpiamos formulario
-                        await loadDataFromDB(); // <--- Esta función recarga la lista desde la BD
-                        resetFormEmpleado();
-
-                        // Usamos tu modal personalizado
-                        showModal({
-                            title: "Éxito",
-                            message: "Empleado guardado correctamente en la base de datos."
-                        });
+                        await loadDataFromDB();
+                        resetFormEmpleado(); // Aquí dentro ya reseteamos el botón
+                        showModal({ title: "Éxito", message: "Empleado guardado correctamente." });
                     } else {
-                        throw new Error(result.error || "Error desconocido al guardar");
+                        throw new Error(result.error || "Error desconocido");
                     }
 
                 } catch (error) {
                     console.error(error);
-                    showModal({
-                        title: "Error",
-                        message: "No se pudo guardar el empleado: " + error.message
-                    });
-                } finally {
-                    // Restauramos el botón
-                    const submitBtn = formEmpleado.querySelector('button[type="submit"]');
-                    if (submitBtn) {
-                        submitBtn.textContent = originalText; // "Guardar Empleado"
-                        submitBtn.disabled = false;
-                    }
+                    showModal({ title: "Error", message: "No se pudo guardar: " + error.message });
+                    // Si hay error, restauramos el botón manualmente aquí también
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
                 }
+                // Nota: Al usar resetFormEmpleado en el success, no necesitamos un finally que sobrescriba
             });
 
             cancelarEdicionEmpleadoBtn.addEventListener('click', resetFormEmpleado);
@@ -2054,11 +2223,12 @@
             };
 
             const loadConfigSS = () => {
-                const storedConfig = JSON.parse(localStorage.getItem('configSS')) || {};
-                configSS = storedConfig;
+                // const storedConfig = JSON.parse(localStorage.getItem('configSS')) || {};
+                // configSS = storedConfig; 
                 for (const [key, defaultValue] of Object.entries(adminFields)) {
                     const input = document.getElementById(key);
                     if (input) {
+                        // Usamos configSS global. Si no tiene dato, usa el default.
                         input.value = configSS[key] !== undefined ? configSS[key] : defaultValue;
                     }
                 }
