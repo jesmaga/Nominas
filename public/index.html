@@ -328,158 +328,64 @@
         </div>
 
         <div id="empleados" class="page-content">
-            <h2 class="text-3xl font-bold text-white mb-6">Gestión de Empleados</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="md:col-span-1 content-card">
-                    <h3 id="form-empleado-titulo" class="text-xl font-semibold text-white mb-4">Añadir Nuevo Empleado
-                    </h3>
-                    <form id="form-empleado" class="space-y-4">
-                        <input type="hidden" id="empleado-id">
-                        <div>
-                            <label for="empleado-nombre" class="block mb-1 text-sm font-medium">Nombre</label>
-                            <input type="text" id="empleado-nombre" class="w-full form-input p-2" required>
-                        </div>
-                        <div>
-                            <label for="empleado-puesto" class="block mb-1 text-sm font-medium">Puesto</label>
-                            <select id="empleado-puesto" class="w-full form-input p-2" required>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="empleado-horas" class="block mb-1 text-sm font-medium">Horas Contrato
-                                Semanales</label>
-                            <input type="number" id="empleado-horas" class="w-full form-input p-2" required>
-                        </div>
-                        <div>
-                            <label for="empleado-tipo-contrato" class="block mb-1 text-sm font-medium">Tipo de
-                                Contrato</label>
-                            <select id="empleado-tipo-contrato" class="w-full form-input p-2" required>
-                                <option value="">-- Selecciona un tipo --</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="empleado-dni" class="block mb-1 text-sm font-medium">DNI</label>
-                            <input type="text" id="empleado-dni" class="w-full form-input p-2" required>
-                        </div>
-                        <div>
-                            <label for="empleado-ss" class="block mb-1 text-sm font-medium">Número SS</label>
-                            <input type="text" id="empleado-ss" class="w-full form-input p-2" required>
-                        </div>
-                        <div>
-                            <label for="empleado-antiguedad" class="block mb-1 text-sm font-medium">Fecha
-                                Antigüedad</label>
-                            <input type="date" id="empleado-antiguedad" class="w-full form-input p-2" required>
-                        </div>
-                        <div>
-                            <label for="empleado-cotizacion" class="block mb-1 text-sm font-medium">Grupo de
-                                Cotización</label>
-                            <input type="text" id="empleado-cotizacion" class="w-full form-input p-2" required>
-                        </div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-white">Gestión de Empleados</h2>
+                <button id="btn-open-new-empleado" class="btn btn-primary">
+                    <i data-lucide="plus" class="w-5 h-5 mr-2"></i> Nuevo Empleado
+                </button>
+            </div>
 
-                        <!-- SECCIÓN DATOS FISCALES (MODELO 145) -->
-                        <div class="border-t border-gray-700 pt-4 mt-4">
-                            <h4 class="text-lg font-semibold text-white mb-3">Datos Fiscales (Modelo 145)</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="empleado-estado-civil" class="block mb-1 text-sm font-medium">Estado
-                                        Civil</label>
-                                    <select id="empleado-estado-civil" class="w-full form-input p-2">
-                                        <option value="soltero">Soltero/a / Divorciado/a</option>
-                                        <option value="casado">Casado/a (y no separado/a)</option>
-                                        <option value="viudo">Viudo/a</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="empleado-anio-nacimiento" class="block mb-1 text-sm font-medium">Año de
-                                        Nacimiento</label>
-                                    <input type="number" id="empleado-anio-nacimiento" class="w-full form-input p-2"
-                                        placeholder="Ej: 1985">
-                                </div>
-                                <div>
-                                    <label for="empleado-discapacidad" class="block mb-1 text-sm font-medium">Grado de
-                                        Discapacidad</label>
-                                    <select id="empleado-discapacidad" class="w-full form-input p-2">
-                                        <option value="0">Sin discapacidad (< 33%)</option>
-                                        <option value="33">>= 33% y < 65%</option>
-                                        <option value="65">>= 65%</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="empleado-hijos" class="block mb-1 text-sm font-medium">Hijos (< 25
-                                            años)</label>
-                                            <input type="number" id="empleado-hijos" class="w-full form-input p-2"
-                                                value="0" min="0">
-                                </div>
-                                <div>
-                                    <label for="empleado-ascendientes"
-                                        class="block mb-1 text-sm font-medium">Ascendientes (> 65 años)</label>
-                                    <input type="number" id="empleado-ascendientes" class="w-full form-input p-2"
-                                        value="0" min="0">
-                                </div>
-                            </div>
+            <div class="content-card">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                    <h3 class="text-xl font-semibold text-white">Directorio de Personal</h3>
+
+                    <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+                            <input type="text" id="empleados-search" placeholder="Buscar nombre, DNI..."
+                                class="form-input pl-9 p-2 text-sm w-full md:w-64">
                         </div>
-                        <div class="flex space-x-2 pt-2">
-                            <button type="submit" class="btn btn-primary w-full">Guardar Empleado</button>
-                            <button type="button" id="cancelar-edicion-empleado"
-                                class="btn btn-secondary w-full hidden">Cancelar</button>
-                        </div>
-                    </form>
+                        <select id="empleados-rows-per-page" class="form-input p-2 text-sm w-20">
+                            <option value="5" selected>5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="md:col-span-2 content-card">
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                        <h3 class="text-xl font-semibold text-white">Lista de Empleados</h3>
 
-                        <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                            <div class="relative">
-                                <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
-                                <input type="text" id="empleados-search" placeholder="Buscar nombre, DNI..."
-                                    class="form-input pl-9 p-2 text-sm w-full md:w-48">
-                            </div>
-                            <select id="empleados-rows-per-page" class="form-input p-2 text-sm w-20">
-                                <option value="5" selected>5</option>
-                                <option value="10">10</option>
-                                <option value="20">20</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="overflow-x-auto">
+                    <table id="lista-empleados" class="w-full data-table text-sm">
+                        <thead>
+                            <tr class="text-gray-400 select-none">
+                                <th class="cursor-pointer hover:text-white sort-header-emp" data-key="nombre">
+                                    <div class="flex items-center">Nombre <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th class="cursor-pointer hover:text-white sort-header-emp" data-key="_puestoNombre">
+                                    <div class="flex items-center">Puesto <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th>Contrato</th>
+                                <th>Nº SS</th>
+                                <th class="cursor-pointer hover:text-white sort-header-emp" data-key="antiguedad">
+                                    <div class="flex items-center">Antigüedad <i data-lucide="arrow-up-down"
+                                            class="w-3 h-3 ml-2"></i></div>
+                                </th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-empleados-body">
+                        </tbody>
+                    </table>
+                </div>
 
-                    <div class="overflow-x-auto">
-                        <table id="lista-empleados" class="w-full data-table">
-                            <thead>
-                                <tr class="text-gray-400 select-none">
-                                    <th class="cursor-pointer hover:text-white sort-header-emp" data-key="nombre">
-                                        <div class="flex items-center">Nombre <i data-lucide="arrow-up-down"
-                                                class="w-3 h-3 ml-2"></i></div>
-                                    </th>
-                                    <th class="cursor-pointer hover:text-white sort-header-emp"
-                                        data-key="_puestoNombre">
-                                        <div class="flex items-center">Puesto <i data-lucide="arrow-up-down"
-                                                class="w-3 h-3 ml-2"></i></div>
-                                    </th>
-                                    <th>Tipo Contrato</th>
-                                    <th class="cursor-pointer hover:text-white sort-header-emp" data-key="dni">
-                                        <div class="flex items-center">DNI <i data-lucide="arrow-up-down"
-                                                class="w-3 h-3 ml-2"></i></div>
-                                    </th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="lista-empleados-body">
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
-                        <span class="text-sm text-gray-400" id="empleados-pagination-info">Mostrando 0 de 0</span>
-                        <div class="flex space-x-2">
-                            <button id="btn-prev-page-emp"
-                                class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                            </button>
-                            <button id="btn-next-page-emp"
-                                class="btn btn-secondary text-xs px-3 py-1 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                            </button>
-                        </div>
+                <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
+                    <span class="text-sm text-gray-400" id="empleados-pagination-info">Mostrando 0 de 0</span>
+                    <div class="flex space-x-2">
+                        <button id="btn-prev-page-emp" class="btn btn-secondary text-xs px-3 py-1"><i
+                                data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                        <button id="btn-next-page-emp" class="btn btn-secondary text-xs px-3 py-1"><i
+                                data-lucide="chevron-right" class="w-4 h-4"></i></button>
                     </div>
                 </div>
             </div>
@@ -1271,6 +1177,125 @@
     </div>
     </div>
 
+    <!-- MODAL AÑADIR EMPLEADO-->
+    <div id="empleado-modal-overlay"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl mx-4 flex flex-col max-h-[90vh]">
+
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="form-empleado-titulo" class="text-xl font-bold text-white">Nuevo Empleado</h3>
+                <button id="btn-close-empleado-modal" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1">
+                <form id="form-empleado" class="space-y-4">
+                    <input type="hidden" id="empleado-id">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-4">
+                            <h4 class="text-blue-400 font-semibold border-b border-gray-600 pb-1">Datos Laborales</h4>
+                            <div>
+                                <label for="empleado-nombre" class="block mb-1 text-sm font-medium">Nombre
+                                    Completo</label>
+                                <input type="text" id="empleado-nombre" class="w-full form-input p-2" required>
+                            </div>
+                            <div>
+                                <label for="empleado-puesto" class="block mb-1 text-sm font-medium">Puesto</label>
+                                <select id="empleado-puesto" class="w-full form-input p-2" required></select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="empleado-horas"
+                                        class="block mb-1 text-sm font-medium">Horas/Semana</label>
+                                    <input type="number" id="empleado-horas" class="w-full form-input p-2" required>
+                                </div>
+                                <div>
+                                    <label for="empleado-cotizacion" class="block mb-1 text-sm font-medium">Grupo
+                                        Cotiz.</label>
+                                    <input type="text" id="empleado-cotizacion" class="w-full form-input p-2" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="empleado-tipo-contrato" class="block mb-1 text-sm font-medium">Tipo de
+                                    Contrato</label>
+                                <select id="empleado-tipo-contrato" class="w-full form-input p-2" required>
+                                    <option value="">-- Selecciona --</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="empleado-antiguedad" class="block mb-1 text-sm font-medium">Fecha
+                                        Antigüedad</label>
+                                    <input type="date" id="empleado-antiguedad" class="w-full form-input p-2" required>
+                                </div>
+                                <div>
+                                    <label for="empleado-ss" class="block mb-1 text-sm font-medium">Número SS</label>
+                                    <input type="text" id="empleado-ss" class="w-full form-input p-2" required>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="empleado-dni" class="block mb-1 text-sm font-medium">DNI / NIE</label>
+                                <input type="text" id="empleado-dni" class="w-full form-input p-2" required>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-green-400 font-semibold border-b border-gray-600 pb-1">Datos Fiscales
+                                (Modelo 145)</h4>
+                            <div>
+                                <label for="empleado-estado-civil" class="block mb-1 text-sm font-medium">Estado
+                                    Civil</label>
+                                <select id="empleado-estado-civil" class="w-full form-input p-2">
+                                    <option value="soltero">Soltero/a / Divorciado/a</option>
+                                    <option value="casado">Casado/a (y no separado/a)</option>
+                                    <option value="viudo">Viudo/a</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="empleado-anio-nacimiento" class="block mb-1 text-sm font-medium">Año
+                                        Nacimiento</label>
+                                    <input type="number" id="empleado-anio-nacimiento" class="w-full form-input p-2"
+                                        placeholder="Ej: 1985">
+                                </div>
+                                <div>
+                                    <label for="empleado-discapacidad"
+                                        class="block mb-1 text-sm font-medium">Discapacidad</label>
+                                    <select id="empleado-discapacidad" class="w-full form-input p-2">
+                                        <option value="0">Ninguna (< 33%)</option>
+                                        <option value="33">>= 33% y < 65%</option>
+                                        <option value="65">>= 65%</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="empleado-hijos" class="block mb-1 text-sm font-medium">Hijos (< 25
+                                            años)</label>
+                                            <input type="number" id="empleado-hijos" class="w-full form-input p-2"
+                                                value="0" min="0">
+                                </div>
+                                <div>
+                                    <label for="empleado-ascendientes" class="block mb-1 text-sm font-medium">Ascend. (>
+                                        65 años)</label>
+                                    <input type="number" id="empleado-ascendientes" class="w-full form-input p-2"
+                                        value="0" min="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-gray-700 flex justify-end space-x-3">
+                        <button type="button" id="btn-cancel-empleado-modal" class="btn btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn btn-primary px-8">Guardar Empleado</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL PARA VER DETALLE DE NÓMINA (LOTE) -->
     <div id="nomina-detail-modal-overlay"
         class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
@@ -1996,19 +2021,27 @@
                 tablaEmpleadosBody.innerHTML = '';
 
                 if (pageData.length === 0) {
-                    tablaEmpleadosBody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">No se encontraron empleados.</td></tr>';
+                    tablaEmpleadosBody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-4">No se encontraron empleados.</td></tr>';
                 } else {
                     pageData.forEach(empleado => {
                         const tr = document.createElement('tr');
+                        tr.className = "hover:bg-gray-800 transition-colors border-b border-gray-700 last:border-0";
                         tr.innerHTML = `
-                            <td>${empleado.nombre}</td>
-                            <td>${empleado._puestoNombre}</td>
-                            <td>${empleado.tipoContrato || 'N/A'}</td>
-                            <td>${empleado.dni}</td>
-                            <td class="flex space-x-2">
-                                <button class="p-2 text-blue-400 hover:text-blue-200" onclick="app.editarEmpleado('${empleado.id}')" title="Editar"><i data-lucide="edit" class="w-5 h-5"></i></button>
-                                <button class="p-2 text-green-500 hover:text-green-300" onclick="app.generarCertificado('${empleado.id}')" title="Certificado Empresa"><i data-lucide="file-text" class="w-5 h-5"></i></button>
-                                <button class="p-2 text-red-500 hover:text-red-300" onclick="app.borrarEmpleado('${empleado.id}')" title="Borrar"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                            <td class="py-3 px-2 font-medium text-white">${empleado.nombre}</td>
+                            <td class="py-3 px-2">${empleado._puestoNombre}</td>
+                            <td class="py-3 px-2 text-gray-400 text-xs">${empleado.tipoContrato || '-'}</td>
+                            <td class="py-3 px-2 font-mono text-xs text-blue-300">${empleado.ss || '-'}</td>
+                            <td class="py-3 px-2 text-sm">${empleado.antiguedad ? new Date(empleado.antiguedad).toLocaleDateString() : '-'}</td>
+                            <td class="py-3 px-2 flex space-x-2">
+                                <button class="p-1.5 bg-blue-900 text-blue-200 rounded hover:bg-blue-800 transition" onclick="app.editarEmpleado('${empleado.id}')" title="Editar">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                                <button class="p-1.5 bg-green-900 text-green-200 rounded hover:bg-green-800 transition" onclick="app.generarCertificado('${empleado.id}')" title="Certificado">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                                </button>
+                                <button class="p-1.5 bg-red-900 text-red-200 rounded hover:bg-red-800 transition" onclick="app.borrarEmpleado('${empleado.id}')" title="Borrar">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
                             </td>
                         `;
                         tablaEmpleadosBody.appendChild(tr);
@@ -2141,7 +2174,8 @@
 
                     if (result.success) {
                         await loadDataFromDB();
-                        resetFormEmpleado(); // Aquí dentro ya reseteamos el botón
+                        resetFormEmpleado();
+                        closeEmpleadoModal();
                         showModal({ title: "Éxito", message: "Empleado guardado correctamente." });
                     } else {
                         throw new Error(result.error || "Error desconocido");
@@ -5006,6 +5040,63 @@
                 });
             }
 
+            // --- LÓGICA MODAL EMPLEADO ---
+            const empleadoModalOverlay = document.getElementById('empleado-modal-overlay');
+            const btnOpenNewEmpleado = document.getElementById('btn-open-new-empleado');
+            const btnCloseEmpleadoModal = document.getElementById('btn-close-empleado-modal');
+            const btnCancelEmpleadoModal = document.getElementById('btn-cancel-empleado-modal');
+
+            const openEmpleadoModal = () => {
+                empleadoModalOverlay.classList.remove('hidden');
+                // Si abrimos para crear uno nuevo (no editar), reseteamos form
+                if (!empleadoIdInput.value) {
+                    resetFormEmpleado();
+                }
+            };
+
+            const closeEmpleadoModal = () => {
+                empleadoModalOverlay.classList.add('hidden');
+                resetFormEmpleado();
+            };
+
+            if (btnOpenNewEmpleado) btnOpenNewEmpleado.addEventListener('click', () => {
+                resetFormEmpleado(); // Asegurar limpieza
+                openEmpleadoModal();
+            });
+
+            if (btnCloseEmpleadoModal) btnCloseEmpleadoModal.addEventListener('click', closeEmpleadoModal);
+            if (btnCancelEmpleadoModal) btnCancelEmpleadoModal.addEventListener('click', closeEmpleadoModal);
+
+            // MODIFICAR app.editarEmpleado para que use el modal
+            app.editarEmpleado = (id) => {
+                const empleado = empleados.find(e => e.id === id);
+                if (empleado) {
+                    // Rellenar formulario
+                    empleadoIdInput.value = empleado.id;
+                    document.getElementById('empleado-nombre').value = empleado.nombre;
+                    document.getElementById('empleado-puesto').value = empleado.puestoId;
+                    document.getElementById('empleado-horas').value = empleado.horas;
+                    document.getElementById('empleado-tipo-contrato').value = empleado.tipoContrato;
+                    document.getElementById('empleado-dni').value = empleado.dni;
+                    document.getElementById('empleado-ss').value = empleado.ss;
+                    document.getElementById('empleado-antiguedad').value = empleado.antiguedad;
+                    document.getElementById('empleado-cotizacion').value = empleado.cotizacion;
+
+                    // Datos Fiscales
+                    document.getElementById('empleado-estado-civil').value = empleado.estadoCivil || 'soltero';
+                    document.getElementById('empleado-anio-nacimiento').value = empleado.anioNacimiento || '';
+                    document.getElementById('empleado-discapacidad').value = empleado.discapacidad || '0';
+                    document.getElementById('empleado-hijos').value = empleado.hijos || '0';
+                    document.getElementById('empleado-ascendientes').value = empleado.ascendientes || '0';
+
+                    // Cambiar título y abrir modal
+                    formEmpleadoTitulo.textContent = `Editar: ${empleado.nombre}`;
+                    empleadoModalOverlay.classList.remove('hidden');
+
+                    // Ya no necesitamos el botón "Cancelar" oculto dentro del form, 
+                    // usamos el del modal, así que no tocamos cancelarEdicionEmpleadoBtn
+                }
+            };
 
             // ==========================================================
             // --- INICIALIZACIÓN DE LA APP ---
