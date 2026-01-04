@@ -4726,6 +4726,15 @@
                     });
                 });
 
+                // EXPONER VARIABLES GLOBALES PARA USO EN CONSOLA (TERMINAL)
+                window.appGlobals = {
+                    conceptos: conceptos,
+                    tiposContrato: tiposContrato,
+                    guardarConfig: guardarConfigEnBD,
+                    empresa: empresa,
+                    configSS: configSS
+                };
+
             } // <--- Cierre de la función init()
 
             // ==========================================================
