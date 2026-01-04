@@ -1418,9 +1418,13 @@
                     if (datosContratos) tiposContrato = datosContratos;
 
                     // 3. Cargar Usuarios (Solo si es admin)
-                    if (sessionStorage.getItem('loggedInUser') === 'admin') {
+                    const currentRole = sessionStorage.getItem('userRole');
+
+                    if (currentRole === 'admin') {
                         const resUsers = await fetch('/api/usuarios');
                         users = await resUsers.json() || [];
+                        // Renderizamos la lista inmediatamente después de cargarla
+                        renderUsuariosList();
                     }
 
                     // 4. Renderizar UI
