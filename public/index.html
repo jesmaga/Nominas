@@ -166,11 +166,12 @@
         <img src="Logo2.png" alt="Cargando..." class="h-24 animate-pulse">
     </div>
     <div id="app-container" class="hidden h-screen flex"></div>
-    <aside class="w-64 bg-gray-900 p-6 flex flex-col justify-between">
+    <aside class="w-64 bg-gray-900 p-6 flex flex-col justify-between z-20 relative">
         <div>
             <div class="mb-10 flex justify-center">
-                <img src="Logo2.png" alt="Logo de la Empresa" class="h-13">
+                <img src="Logo2.png" alt="Logo" class="h-13">
             </div>
+
             <nav class="flex flex-col space-y-2">
                 <a href="#puestos"
                     class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
@@ -183,13 +184,6 @@
                     data-target="empleados">
                     <i data-lucide="users" class="sidebar-icon"></i>
                     <span>Empleados</span>
-                </a>
-                -->
-                <a href="#admin"
-                    class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
-                    data-target="admin">
-                    <i data-lucide="sliders-horizontal" class="sidebar-icon"></i>
-                    <span>Admin</span>
                 </a>
                 <a href="#nominas"
                     class="nav-link flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200"
@@ -210,30 +204,50 @@
                     <span>Historial</span>
                 </a>
             </nav>
-            <div class="mt-auto pt-4 border-t border-gray-700"> <button id="logout-button"
-                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-red-700 text-gray-300 transition-colors duration-200 w-full text-left">
-                    <i data-lucide="log-out" class="sidebar-icon"></i>
-                    <span>Cerrar Sesión</span>
+        </div>
+
+        <div class="relative mt-auto pt-4 border-t border-gray-700">
+
+            <button id="user-menu-btn"
+                class="flex items-center w-full p-2 rounded-lg hover:bg-gray-800 transition-colors text-left focus:outline-none">
+                <div
+                    class="bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center text-white font-bold mr-3">
+                    <span id="user-avatar-initials">U</span>
+                </div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-white" id="user-name-display">Usuario</p>
+                    <p class="text-xs text-gray-400" id="user-role-display">Empleado</p>
+                </div>
+                <i data-lucide="chevron-up" class="w-4 h-4 text-gray-400"></i>
+            </button>
+
+            <div id="user-dropdown"
+                class="absolute bottom-full left-0 w-full mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden hidden transform transition-all duration-200 origin-bottom">
+
+                <div id="admin-only-options" class="hidden">
+                    <a href="#admin" data-target="admin"
+                        class="nav-link flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                        <i data-lucide="shield" class="w-4 h-4 mr-3"></i> Administración
+                    </a>
+                    <button id="exportar-datos"
+                        class="w-full text-left flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                        <i data-lucide="download" class="w-4 h-4 mr-3"></i> Exportar Datos
+                    </button>
+                    <button id="importar-datos"
+                        class="w-full text-left flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                        <i data-lucide="upload" class="w-4 h-4 mr-3"></i> Importar Datos
+                    </button>
+                    <div class="border-t border-gray-700 my-1"></div>
+                </div>
+
+                <button id="logout-button"
+                    class="w-full text-left flex items-center px-4 py-3 text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4 mr-3"></i> Cerrar Sesión
                 </button>
             </div>
-        </div>
-        <div>
-        </div>
-        <div>
-            <div class="py-4 border-t border-gray-700 space-y-2">
-                <button id="exportar-datos"
-                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200 w-full text-left">
-                    <i data-lucide="download" class="sidebar-icon"></i>
-                    <span>Exportar Datos</span>
-                </button>
-                <button id="importar-datos"
-                    class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-700 text-gray-300 transition-colors duration-200 w-full text-left">
-                    <i data-lucide="upload" class="sidebar-icon"></i>
-                    <span>Importar Datos</span>
-                </button>
-            </div>
-            <div class="text-xs text-gray-500 pt-4 border-t border-gray-700">
-                <p>&copy; 2025 App de Nóminas</p>
+
+            <div class="text-xs text-gray-600 text-center mt-2">
+                &copy; 2026 App Nóminas
             </div>
         </div>
     </aside>
@@ -4471,6 +4485,72 @@
                 });
 
             } // <--- Cierre de la función init()
+
+            // ==========================================================
+            // --- LÓGICA DEL MENÚ DE USUARIO ---
+            // ==========================================================
+            const userMenuBtn = document.getElementById('user-menu-btn');
+            const userDropdown = document.getElementById('user-dropdown');
+            const userNameDisplay = document.getElementById('user-name-display');
+            const userRoleDisplay = document.getElementById('user-role-display');
+            const userAvatarInitials = document.getElementById('user-avatar-initials');
+            const adminOnlyOptions = document.getElementById('admin-only-options');
+
+            // 1. Configurar datos del usuario actual
+            const currentUser = sessionStorage.getItem('loggedInUser') || 'Usuario';
+
+            // Actualizar interfaz con nombre y rol
+            userNameDisplay.textContent = currentUser.charAt(0).toUpperCase() + currentUser.slice(1);
+            userAvatarInitials.textContent = currentUser.charAt(0).toUpperCase();
+
+            if (currentUser === 'admin') {
+                userRoleDisplay.textContent = 'Administrador';
+                userRoleDisplay.className = 'text-xs text-blue-400';
+                // Mostrar opciones de admin
+                if (adminOnlyOptions) adminOnlyOptions.classList.remove('hidden');
+            } else {
+                userRoleDisplay.textContent = 'Gestor';
+                if (adminOnlyOptions) adminOnlyOptions.classList.add('hidden');
+            }
+
+            // 2. Toggle del Menú
+            if (userMenuBtn && userDropdown) {
+                userMenuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    userDropdown.classList.toggle('hidden');
+
+                    // Rotar flecha (opcional visual)
+                    const icon = userMenuBtn.querySelector('[data-lucide="chevron-up"]');
+                    if (icon) {
+                        if (!userDropdown.classList.contains('hidden')) {
+                            // Si tienes CSS para rotar, añádelo aquí, o simplemente cambia el icono
+                            // icon.style.transform = 'rotate(180deg)'; 
+                        }
+                    }
+                });
+
+                // Cerrar menú al hacer clic fuera
+                document.addEventListener('click', (e) => {
+                    if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                        userDropdown.classList.add('hidden');
+                    }
+                });
+
+                // Cerrar menú al hacer clic en una opción
+                userDropdown.addEventListener('click', () => {
+                    userDropdown.classList.add('hidden');
+                });
+            }
+
+            // IMPORTANTE: Asegurarse de que el enlace de Admin dentro del menú funcione 
+            // con la lógica de navegación existente (showPage)
+            const adminLinkMenu = document.querySelector('#user-dropdown a[data-target="admin"]');
+            if (adminLinkMenu) {
+                adminLinkMenu.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showPage('admin');
+                });
+            }
 
             // Arrancamos la aplicación
             init();
