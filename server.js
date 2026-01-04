@@ -128,34 +128,40 @@ const parseSpanishNumber = (str) => {
     return isNaN(num) ? 0 : num;
 };
 
-// --- EXTRACTOR DE DATOS MEJORADO (Soporta formatos complejos) ---
-// --- EXTRACTOR DE DATOS MEJORADO (Soporta formatos con puntos suspensivos) ---
+// --- EXTRACTOR DE DATOS BLINDADO (Ignora fórmulas como 1+2) ---
 const extractDataFromPDF = (text) => {
     const data = {};
-    // Normalizamos: quitamos saltos de línea extraños y espacios múltiples para facilitar la búsqueda
-    // Reemplaza puntos suspensivos unicode (\u2026) por puntos normales si los hubiera
+
+    // 1. Limpieza inicial
+    // Reemplazamos saltos de línea por espacios y unificamos puntos
     const cleanText = text.replace(/\s+/g, ' ').replace(/\u2026/g, '...');
 
-    console.log("--> Texto para extracción (inicio):", cleanText.substring(0, 300)); // Log para depurar
+    // Helper para buscar importes monetarios (Busca: Cifras, coma, dos decimales)
+    // El patrón .*? salta cualquier cosa (incluido "(1 + 2)") hasta llegar al importe
+    const extractCurrency = (labelRegex) => {
+        // Construimos una regex dinámica: Etiqueta + cualquier cosa + (NUMERO,DECIMALES)
+        // Ejemplo generado: /TOTAL\s+DEVENGADO.*?(\d+(?:\.\d+)*,\d{2})/i
+        const fullRegex = new RegExp(labelRegex.source + ".*?(\\d+(?:\\.\\d+)*,\\d{2})", "i");
+        const match = cleanText.match(fullRegex);
+        return match ? parseSpanishNumber(match[1]) : 0;
+    };
 
-    // 1. DNI (Prioridad absoluta)
-    // Busca patrón 8 números + letra, ignorando guiones o espacios intermedios
+    // 2. EXTRACCIONES CLAVE
+
+    // DNI (Prioridad absoluta)
     const dniMatch = cleanText.match(/(\d{8})[-\s]*([A-Z])/i);
-    if (dniMatch) {
-        data.dni = (dniMatch[1] + dniMatch[2]).toUpperCase();
-    }
+    if (dniMatch) data.dni = (dniMatch[1] + dniMatch[2]).toUpperCase();
 
-    // 2. FECHAS (Buscamos año y mes en el texto)
+    // FECHAS (Año y Mes)
     const anioMatch = cleanText.match(/\b(20\d{2})\b/);
     if (anioMatch) data.anio = parseInt(anioMatch[1]);
 
     const mesesRegex = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
-    const mesMatch = cleanText.match(mesesRegex);
+    const mesMatch = cleanText.match(mesRegex);
     if (mesMatch) {
         const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
         data.mes = meses.indexOf(mesMatch[0].toLowerCase()) + 1;
     } else {
-        // Fallback: buscar formato numérico dd/mm/aaaa si no hay texto
         const fechaNum = cleanText.match(/\d{2}\/(\d{2})\/(20\d{2})/);
         if (fechaNum) {
             data.mes = parseInt(fechaNum[1]);
@@ -163,55 +169,39 @@ const extractDataFromPDF = (text) => {
         }
     }
 
-    // --- FUNCIÓN HELPER PARA VALORES MONETARIOS ---
-    // Esta función es la clave: busca la etiqueta y permite que haya "ruido" (puntos, paréntesis, letras) 
-    // antes de capturar el importe final.
-    const extractAmount = (regex) => {
-        const match = cleanText.match(regex);
-        return match ? parseSpanishNumber(match[1]) : 0;
-    };
+    // 3. CONCEPTOS ECONÓMICOS (Usando el nuevo buscador de moneda)
 
-    // 3. CONCEPTOS ECONÓMICOS (Adaptados a tu PDF)
+    // Total Devengado
+    // Ignorará el "(1 + 2)" y buscará el "250,22"
+    data.total_devengado = extractCurrency(/TOTAL\s+DEVENGADO/);
 
-    // Total Devengado: 
-    // PDF: "A. TOTAL DEVENGADO (1 + 2) ............ 250,22"
-    // Regex: Busca "TOTAL DEVENGADO", ignora todo lo que no sea dígito hasta el final, captura el número.
-    data.total_devengado = extractAmount(/TOTAL\s+DEVENGADO(?:[^\d]+)([\d\.,]+)/i);
+    // Líquido a Percibir
+    // Ignorará el "(A - B)" y buscará el "234,00"
+    data.liquido_percibir = extractCurrency(/L[IÍ]QUIDO\s+TOTAL/);
 
-    // Líquido: 
-    // PDF: "LÍQUIDO TOTAL A PERCIBIR (A - B).................. 234,00"
-    data.liquido_percibir = extractAmount(/L[IÍ]QUIDO\s+TOTAL(?:[^\d]+)([\d\.,]+)/i);
+    // Bases de Cotización
+    // Priorizamos "Remuneración mensual" que aparece justo antes de la tabla de bases
+    data.base_cc = extractCurrency(/Remuneraci[oó]n\s+mensual/);
 
-    // Bases de Cotización (Suelen estar al pie)
-    // PDF: "Remuneración mensual 250,22" o "Base Contingencias Comunes ... 250,22"
-    // Priorizamos "Remuneración mensual" que aparece clara en tu PDF
-    data.base_cc = extractAmount(/Remuneraci[oó]n\s+mensual(?:[^\d]+)([\d\.,]+)/i);
+    // Si falla, intentamos buscar por "Base Contingencias Comunes"
     if (!data.base_cc) {
-        data.base_cc = extractAmount(/Base\s+Contingencias\s+Comunes(?:[^\d]+)([\d\.,]+)/i);
+        data.base_cc = extractCurrency(/Base\s+Contingencias\s+Comunes/);
     }
 
-    // Prorrata (si existe separada)
-    data.prorrata = extractAmount(/Prorrata\s+pagas\s+extras(?:[^\d]+)([\d\.,]+)/i);
-
-    // Base Contingencias Profesionales
-    data.base_cp = extractAmount(/Base\s+Contingencias\s+Profesionales(?:[^\d]+)([\d\.,]+)/i) || data.base_cc;
+    // Base CP (Suele ser igual a la CC en nóminas sencillas si no se detecta otra)
+    data.base_cp = extractCurrency(/Base\s+Contingencias\s+Profesionales/) || data.base_cc;
 
     // Base IRPF
-    // PDF: "Base sujeta a retención del IRPF"
-    data.base_irpf = extractAmount(/Base\s+sujeta\s+a\s+retenci[oó]n(?:[^\d]+)([\d\.,]+)/i) || data.total_devengado;
+    data.base_irpf = extractCurrency(/Base\s+sujeta\s+a\s+retenci[oó]n/) || data.total_devengado;
 
-    // Cuota IRPF (Deducción)
-    // PDF: "2. Impuesto sobre la renta de las personas fisicas"
-    // Buscamos cerca de ese texto. Si no tiene importe (es 0), el regex podría fallar o capturar el siguiente número.
-    const irpfMatch = cleanText.match(/Impuesto\s+sobre\s+la\s+renta(?:[^\d]+)([\d\.,]+)/i);
-    if (irpfMatch) {
-        const val = parseSpanishNumber(irpfMatch[1]);
-        // Validación de seguridad: la cuota de IRPF no puede ser mayor que el devengado total (evita capturar bases por error)
-        if (val < data.total_devengado) {
-            data.cuota_irpf = val;
-        } else {
-            data.cuota_irpf = 0;
-        }
+    // Cuota IRPF
+    // Buscamos algo como "12,50" cerca de "Impuesto sobre la renta" o "IRPF"
+    const posibleCuotaIRPF = extractCurrency(/Impuesto\s+sobre\s+la\s+renta/);
+
+    // Validación de seguridad: La cuota no puede ser mayor que la base.
+    // Si captura un número gigante, es que ha pillado la base por error.
+    if (posibleCuotaIRPF > 0 && posibleCuotaIRPF < (data.total_devengado * 0.5)) {
+        data.cuota_irpf = posibleCuotaIRPF;
     } else {
         data.cuota_irpf = 0;
     }
