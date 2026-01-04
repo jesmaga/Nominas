@@ -2334,6 +2334,7 @@
                 select.value = currentValue; // Restaurar valor si existía
             };
 
+
             // ==========================================================
             // --- LÓGICA GESTIÓN DE USUARIOS (ADMIN) ---
             // ==========================================================
@@ -4723,7 +4724,7 @@
             } // <--- Cierre de la función init()
 
             // ==========================================================
-            // --- LÓGICA DEL MENÚ DE USUARIO ---
+            // --- LÓGICA DEL MENÚ DE USUARIO (ACTUALIZADA) ---
             // ==========================================================
             const userMenuBtn = document.getElementById('user-menu-btn');
             const userDropdown = document.getElementById('user-dropdown');
@@ -4732,54 +4733,51 @@
             const userAvatarInitials = document.getElementById('user-avatar-initials');
             const adminOnlyOptions = document.getElementById('admin-only-options');
 
-            // 1. Configurar datos del usuario actual
+            // 1. Obtener datos de sesión
             const currentUser = sessionStorage.getItem('loggedInUser') || 'Usuario';
+            // IMPORTANTE: Ahora leemos el ROL guardado en auth.js
+            const currentRole = sessionStorage.getItem('userRole') || 'user';
 
-            // Actualizar interfaz con nombre y rol
-            userNameDisplay.textContent = currentUser.charAt(0).toUpperCase() + currentUser.slice(1);
+            // 2. Mostrar datos en interfaz
+            userNameDisplay.textContent = currentUser; // Muestra el nombre (ej: jesmaga@...)
             userAvatarInitials.textContent = currentUser.charAt(0).toUpperCase();
 
-            if (currentUser === 'admin') {
+            // 3. Lógica de Roles
+            if (currentRole === 'admin') {
+                // Caso: Usuario admin
                 userRoleDisplay.textContent = 'Administrador';
-                userRoleDisplay.className = 'text-xs text-blue-400';
-                // Mostrar opciones de admin
+                userRoleDisplay.className = 'text-xs text-blue-400 font-semibold';
+
+                // Mostrar opciones de administración
                 if (adminOnlyOptions) adminOnlyOptions.classList.remove('hidden');
             } else {
+                // Caso: jesmaga@ceipinocho.es (o cualquier otro usuario normal)
                 userRoleDisplay.textContent = 'Gestor';
+                userRoleDisplay.className = 'text-xs text-gray-400';
+
+                // Ocultar opciones de administración
                 if (adminOnlyOptions) adminOnlyOptions.classList.add('hidden');
             }
 
-            // 2. Toggle del Menú
+            // 4. Toggle del Menú (Igual que antes)
             if (userMenuBtn && userDropdown) {
                 userMenuBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     userDropdown.classList.toggle('hidden');
-
-                    // Rotar flecha (opcional visual)
-                    const icon = userMenuBtn.querySelector('[data-lucide="chevron-up"]');
-                    if (icon) {
-                        if (!userDropdown.classList.contains('hidden')) {
-                            // Si tienes CSS para rotar, añádelo aquí, o simplemente cambia el icono
-                            // icon.style.transform = 'rotate(180deg)'; 
-                        }
-                    }
                 });
 
-                // Cerrar menú al hacer clic fuera
                 document.addEventListener('click', (e) => {
                     if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
                         userDropdown.classList.add('hidden');
                     }
                 });
 
-                // Cerrar menú al hacer clic en una opción
                 userDropdown.addEventListener('click', () => {
                     userDropdown.classList.add('hidden');
                 });
             }
 
-            // IMPORTANTE: Asegurarse de que el enlace de Admin dentro del menú funcione 
-            // con la lógica de navegación existente (showPage)
+            // Listener para enlace Admin dentro del menú
             const adminLinkMenu = document.querySelector('#user-dropdown a[data-target="admin"]');
             if (adminLinkMenu) {
                 adminLinkMenu.addEventListener('click', (e) => {
