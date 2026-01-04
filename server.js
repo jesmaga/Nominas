@@ -131,51 +131,25 @@ const parseSpanishNumber = (str) => {
 const extractDataFromPDF = (text) => {
     const data = {};
 
-    // 1. LIMPIEZA PREVIA (CRÍTICA)
+    // 1. LIMPIEZA: Normalizamos espacios y corregimos el error tipográfico específico de tu PDF
     let cleanText = text
         .replace(/extraordinaRORRATA/gi, "extraordinarias PRORRATA")
         .replace(/\r\n/g, "\n")
-        .replace(/\s+/g, " "); // Colapsa espacios múltiples
+        .replace(/\s+/g, " ");
 
-    // --- HELPER AVANZADO PARA COLUMNAS ---
-    // Permite saltar N números para llegar a la columna correcta (Cuota)
-    // Estructura típica fila: [Concepto] [Base] [Porcentaje] [Cuota]
-    const extractColumnAmount = (labelRegex, skipCount) => {
-        // Construimos una regex dinámica:
-        // 1. Encuentra la etiqueta
-        // 2. (Opcional) Salta N grupos de números (bases/porcentajes)
-        // 3. Captura el siguiente número (la cuota)
-        let patternStr = labelRegex.source + ".*?";
-
-        for (let i = 0; i < skipCount; i++) {
-            // Salta un número (ej: 250,22) y cualquier texto/espacio/símbolo % intermedio
-            patternStr += "(\\d+[.,]\\d{2}).*?";
-        }
-        // Captura el número final
-        patternStr += "(\\d+[.,]\\d{2})";
-
-        const match = cleanText.match(new RegExp(patternStr, "i"));
-
-        // Si pedimos saltar 2, el match[1] es el salto 1, match[2] es el salto 2, match[3] es el target
-        if (match && match[skipCount + 1]) {
-            return parseSpanishNumber(match[skipCount + 1]);
-        }
-        return 0;
-    };
-
-    // Wrapper simple para búsqueda directa
     const extractAmount = (regex) => {
         const match = cleanText.match(regex);
         return match ? parseSpanishNumber(match[1]) : 0;
     };
 
-    // 2. DATOS PERSONALES
+    // 2. DATOS BÁSICOS
     const dniMatch = cleanText.match(/(\d{8})[-\s]*([A-Z])/i);
     if (dniMatch) data.dni = (dniMatch[1] + dniMatch[2]).toUpperCase();
 
-    // Fechas
-    const anioMatch = cleanText.match(/\b(20\d{2})\b/);
-    if (anioMatch) data.anio = parseInt(anioMatch[1]);
+    const anioMatch = cleanText.match(/\b20\d{2}\b/);
+    if (anioMatch) data.anio = parseInt(anioMatch[0]);
+
+    // Mes: Buscamos "Febrero" explícitamente o mapeamos
     const mesesRegex = /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i;
     const mesMatch = cleanText.match(mesesRegex);
     if (mesMatch) {
@@ -183,66 +157,57 @@ const extractDataFromPDF = (text) => {
         data.mes = meses.indexOf(mesMatch[0].toLowerCase()) + 1;
     }
 
-    // 3. CONCEPTOS ECONÓMICOS
+    // 3. CONCEPTOS ECONÓMICOS (Ajustados a tu PDF)
 
-    // Salario Base y Prorrata
-    data.salario_base = extractAmount(/Salario\s+base.*?(\d+[.,]\d{2})/i);
-    // FIX: Buscar "Gratificaciones" explícitamente para la prorrata
-    data.prorrata = extractAmount(/Gratificaciones.*?(\d+[.,]\d{2})/i);
+    // Salario Base: Aparece como "Salario base 161,41"
+    data.salario_base = extractAmount(/Salario\s+base\s.*?(\d+[.,]\d{2})/i);
 
-    // Otros conceptos
-    data.incentivo = extractAmount(/Incentivo.*?(\d+[.,]\d{2})/i);
-    data.cpp = extractAmount(/CPP.*?(\d+[.,]\d{2})/i);
+    // Prorrata: Aparece tras corregir el typo
+    data.prorrata = extractAmount(/Gratificaciones\s+extraordinarias\s+PRORRATA\s.*?(\d+[.,]\d{2})/i);
 
-    // TOTALES (FIX: Mejor regex para ignorar paréntesis "(1+2)")
-    data.total_devengado = extractAmount(/TOTAL\s+DEVENGADO[^(]*.*?\)\D*(\d+[.,]\d{2})/i);
-    if (!data.total_devengado) {
-        // Fallback: busca el número más grande cerca de "Total Devengado" si falla el paréntesis
-        data.total_devengado = extractAmount(/TOTAL\s+DEVENGADO.*?(\d+[.,]\d{2})/i);
-    }
+    // Incentivo y CPP (Importante para tu PDF)
+    data.incentivo = extractAmount(/Incentivo\s.*?(\d+[.,]\d{2})/i);
+    data.cpp = extractAmount(/CPP\s.*?(\d+[.,]\d{2})/i);
 
-    // LÍQUIDO (FIX: Ampliar búsqueda porque el número suele estar lejos o en otra línea)
-    data.liquido_percibir = extractAmount(/L[IÍ]QUIDO\s+TOTAL[\s\S]*?(\d+[.,]\d{2})/i);
+    // TOTALES
+    // El PDF dice: "A. TOTAL DEVENGADO (1 + 2) ............ 250,22"
+    // Usamos una regex que ignora lo que haya entre "DEVENGADO" y el número para evitar fallos con "(1 + 2)"
+    data.total_devengado = extractAmount(/TOTAL\s+DEVENGADO.*?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
 
+    // LÍQUIDO
+    // El PDF dice: "LÍQUIDO TOTAL A PERCIBIR (A - B).................. 234,00"
+    data.liquido_percibir = extractAmount(/L[IÍ]QUIDO\s+TOTAL.*?(\d{1,3}(?:\.\d{3})*,\d{2})/i);
 
-    // 4. BASES Y DEDUCCIONES (Lógica corregida por columnas)
+    // 4. BASES Y DEDUCCIONES (Esta es la parte difícil con pdf-parse)
 
-    // Bases
+    // En tu PDF, las bases están en una tabla al final.
+    // Buscamos "Remuneración mensual" que suele tener la Base de Contingencias Comunes al lado.
     data.base_cc = extractAmount(/Remuneraci[oó]n\s+mensual.*?(\d+[.,]\d{2})/i);
-    // Si falla, busca en el pie de página
-    if (!data.base_cc) data.base_cc = extractAmount(/Base\s+Contingencias\s+Comunes.*?(\d+[.,]\d{2})/i);
 
-    data.base_cp = extractAmount(/Base\s+Contingencias\s+Profesionales.*?(\d+[.,]\d{2})/i) || data.base_cc;
+    // Base IRPF: Está en la tabla inferior "4. Base sujeta a retención del IRPF 330,46"
     data.base_irpf = extractAmount(/Base\s+sujeta\s+a\s+retenci[oó]n.*?(\d+[.,]\d{2})/i);
 
-    // DEDUCCIONES (Usando extractColumnAmount para saltar Base y Porcentaje)
+    // Cuota IRPF (Retención):
+    // En el pie de página dice: "Total: 80,24" justo después de la base IRPF.
+    // Intentamos capturar ese "Total:" específico que va después de "Base sujeta a retención"
+    const irpfBlock = cleanText.split("Base sujeta a retención")[1] || "";
+    const cuotaIrpfMatch = irpfBlock.match(/Total:\s*(\d+[.,]\d{2})/i);
+    data.cuota_irpf = cuotaIrpfMatch ? parseSpanishNumber(cuotaIrpfMatch[1]) : 0;
 
-    // Contingencias Comunes: Texto es "Contingencias comunes [250,22] [4,70%] [11,76]" -> Saltamos 2
-    data.cuota_cc = extractColumnAmount(/Contingencias\s+comunes/i, 2);
+    // Deducciones SS:
+    // Como pdf-parse aplana el texto, buscar por columnas es arriesgado.
+    // Lo más seguro en Node.js para esta nómina es CALCULARLAS si tienes la base,
+    // o usar regex muy permisivas.
+    // Tu PDF tiene: "Contingencias comunes ... 11,76"
+    // Buscamos el porcentaje "4,70%" y cogemos el número que le sigue
+    data.cuota_cc = extractAmount(/4,70%\s*(\d+[.,]\d{2})/);
+    data.cuota_desempleo = extractAmount(/1,55%\s*(\d+[.,]\d{2})/);
+    data.cuota_fp = extractAmount(/0,10%\s*(\d+[.,]\d{2})/); // Ojo, a veces el PDF pone 0,109 o similar
 
-    // Desempleo: Texto es "Desempleo [250,22] [1,55%] [3,88]" -> Saltamos 2
-    data.cuota_desempleo = extractColumnAmount(/Desempleo/i, 2);
-
-    // Formación Profesional: Texto es "Formación Profesional [250,22] [0,10%] [0,25]" -> Saltamos 2
-    data.cuota_fp = extractColumnAmount(/Formaci[oó]n\s+Profesional/i, 2);
-
-    // MEI: Texto es "M.E.I. [250,22] [0,13] [0,33]" (A veces sin %) -> Saltamos 2
-    data.cuota_mei = extractColumnAmount(/M\.?E\.?I\.?/i, 2);
-
-    // IRPF (A veces no tiene base delante en la línea de deducción, solo porcentaje)
-    // Primero intentamos buscarlo como cuota directa cerca del texto "Impuesto sobre la renta"
-    data.cuota_irpf = extractAmount(/Impuesto\s+sobre\s+la\s+renta.*?(\d+[.,]\d{2})/i);
-
-    // VALIDACIÓN DE SEGURIDAD
-    // Si la cuota extraída es idéntica a la base o al devengo total, es un error de regex
-    if (data.cuota_irpf >= data.total_devengado || data.cuota_irpf === data.base_irpf) {
-        data.cuota_irpf = 0;
-    }
-
-    // Si las cuotas de SS son 0 (porque falló extractColumnAmount), intentamos cálculo inverso seguro
-    // Solo si tenemos la base correcta
-    if (data.cuota_cc === 0 && data.base_cc > 0) data.cuota_cc = parseFloat((data.base_cc * 0.047).toFixed(2));
-    if (data.cuota_desempleo === 0 && data.base_cp > 0) data.cuota_desempleo = parseFloat((data.base_cp * 0.0155).toFixed(2));
+    // Si fallan las regex de cuotas (común en pdf-parse), las calculamos
+    if (!data.cuota_cc && data.base_cc) data.cuota_cc = parseFloat((data.base_cc * 0.047).toFixed(2));
+    if (!data.cuota_desempleo && data.base_cc) data.cuota_desempleo = parseFloat((data.base_cc * 0.0155).toFixed(2));
+    if (!data.cuota_fp && data.base_cc) data.cuota_fp = parseFloat((data.base_cc * 0.001).toFixed(2));
 
     return data;
 };
