@@ -80,9 +80,14 @@ const initDB = async () => {
         await client.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
                 username TEXT PRIMARY KEY,
-                password_hash TEXT
+                password_hash TEXT,
+                role TEXT DEFAULT 'user'
             )
         `);
+
+        try {
+            await client.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'`);
+        } catch (e) { /* ignorar si ya existe */ }
 
         // 5. Tabla Configuraciones (SS, Empresa, Conceptos, Contratos)
         await client.query(`
@@ -444,7 +449,8 @@ app.post('/api/login', async (req, res) => {
         const user = result.rows[0];
 
         if (user && user.password_hash === passwordHash) {
-            res.json({ success: true, user: user.username });
+            // Devolvemos también el rol
+            res.json({ success: true, user: user.username, role: user.role || 'user' });
         } else {
             res.status(401).json({ success: false, error: "Credenciales incorrectas" });
         }
@@ -456,17 +462,77 @@ app.post('/api/login', async (req, res) => {
 // --- GESTIÓN DE USUARIOS ---
 app.get('/api/usuarios', async (req, res) => {
     try {
-        const result = await pool.query("SELECT username FROM usuarios");
+        const result = await pool.query("SELECT username, role FROM usuarios");
         res.json(result.rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/usuarios', async (req, res) => {
-    const { username, passwordHash } = req.body;
+    const { username, passwordHash, role } = req.body;
     try {
-        await pool.query("INSERT INTO usuarios (username, password_hash) VALUES ($1, $2)", [username, passwordHash]);
+        // Rol por defecto 'user' si no se envía
+        const userRole = role || 'user';
+        await pool.query(
+            "INSERT INTO usuarios (username, password_hash, role) VALUES ($1, $2, $3)",
+            [username, passwordHash, userRole]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        // Manejo de error específico por si ya existe
+        if (e.code === '23505') { // Código PostgreSQL para unique_violation
+            return res.status(400).json({ error: "El nombre de usuario ya existe." });
+        }
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/usuarios/:username', async (req, res) => {
+    const { username } = req.params;
+    const { passwordHash, role } = req.body;
+
+    try {
+        // Construcción dinámica de la query
+        let query = "UPDATE usuarios SET role = $1";
+        let params = [role || 'user'];
+        let paramIndex = 2;
+
+        if (passwordHash) {
+            query += `, password_hash = $${paramIndex}`;
+            params.push(passwordHash);
+            paramIndex++;
+        }
+
+        query += ` WHERE username = $${paramIndex}`;
+        params.push(username);
+
+        const result = await pool.query(query, params);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Usuario no encontrado" });
+        }
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/change-password', async (req, res) => {
+    const { username, currentPasswordHash, newPasswordHash } = req.body;
+    try {
+        // 1. Verificar contraseña actual
+        const result = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
+        const user = result.rows[0];
+
+        if (!user || user.password_hash !== currentPasswordHash) {
+            return res.status(401).json({ success: false, error: "La contraseña actual es incorrecta." });
+        }
+
+        // 2. Actualizar contraseña
+        await pool.query("UPDATE usuarios SET password_hash = $1 WHERE username = $2", [newPasswordHash, username]);
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.delete('/api/usuarios/:username', async (req, res) => {

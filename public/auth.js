@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
 
     // Limpiamos mensajes de error al escribir
-    if(loginForm) {
+    if (loginForm) {
         const inputs = loginForm.querySelectorAll('input');
         inputs.forEach(input => {
             input.addEventListener('input', () => {
@@ -43,9 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Login correcto
                     sessionStorage.setItem('isLoggedIn', 'true');
                     sessionStorage.setItem('loggedInUser', data.user); // Guardamos quién entró
-                    
+                    sessionStorage.setItem('userRole', data.role); // Guardamos el rol
+
                     // IMPORTANTE: Redirigimos a index.html (en minúsculas si lo renombraste)
-                    window.location.href = 'index.html'; 
+                    window.location.href = 'index.html';
                 } else {
                     // Contraseña incorrecta o usuario no existe en BD
                     errorMessage.textContent = "Usuario o contraseña incorrectos.";

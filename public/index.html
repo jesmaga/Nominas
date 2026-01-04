@@ -240,6 +240,11 @@
                     <div class="border-t border-gray-700 my-1"></div>
                 </div>
 
+                <button id="btn-user-change-pass"
+                    class="w-full text-left flex items-center px-4 py-3 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                    <i data-lucide="key" class="w-4 h-4 mr-3"></i> Cambiar Contraseña
+                </button>
+
                 <button id="logout-button"
                     class="w-full text-left flex items-center px-4 py-3 text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors">
                     <i data-lucide="log-out" class="w-4 h-4 mr-3"></i> Cerrar Sesión
@@ -637,26 +642,58 @@
             <div id="admin-usuarios" class="admin-tab-content">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="content-card">
-                        <h3 class="text-xl font-semibold text-white mb-4">Añadir Nuevo Usuario</h3>
+                        <h3 id="form-usuario-titulo" class="text-xl font-semibold text-white mb-4">Añadir Nuevo Usuario
+                        </h3>
                         <form id="form-add-usuario" class="space-y-4">
+                            <input type="hidden" id="is-editing-user" value="false">
+                            <input type="hidden" id="editing-username-original" value="">
+
                             <div>
                                 <label for="new-username" class="block mb-1 text-sm font-medium">Nombre de
                                     Usuario</label>
                                 <input type="text" id="new-username" class="w-full form-input p-2" required>
                             </div>
+
+                            <div>
+                                <label for="new-user-role" class="block mb-1 text-sm font-medium">Rol del
+                                    Usuario</label>
+                                <select id="new-user-role" class="w-full form-input p-2" required>
+                                    <option value="user">Usuario (Normal)</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+
                             <div>
                                 <label for="new-password" class="block mb-1 text-sm font-medium">Contraseña</label>
-                                <input type="password" id="new-password" class="w-full form-input p-2" required>
+                                <input type="password" id="new-password" class="w-full form-input p-2"
+                                    placeholder="Contraseña inicial">
+                                <p id="password-hint" class="text-xs text-gray-500 mt-1 hidden">Dejar en blanco para
+                                    mantener la contraseña actual.</p>
                             </div>
-                            <div class="pt-2">
-                                <button type="submit" class="btn btn-primary w-full">Añadir Usuario</button>
+
+                            <div class="flex space-x-2 pt-2">
+                                <button type="submit" class="btn btn-primary w-full">Guardar Usuario</button>
+                                <button type="button" id="btn-cancel-edit-usuario"
+                                    class="btn btn-secondary w-full hidden">Cancelar</button>
                             </div>
                         </form>
                     </div>
+
                     <div class="content-card">
                         <h3 class="text-xl font-semibold text-white mb-4">Usuarios Existentes</h3>
-                        <ul id="lista-usuarios" class="space-y-2">
-                        </ul>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-gray-400 border-b border-gray-700 text-sm">
+                                        <th class="p-2">Usuario</th>
+                                        <th class="p-2">Rol</th>
+                                        <th class="p-2 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lista-usuarios" class="text-sm">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1238,6 +1275,32 @@
                 <button type="button" id="batch-modal-cancel-btn" class="btn btn-secondary">Cancelar</button>
                 <button type="button" id="batch-modal-save-btn" class="btn btn-primary">Guardar Cambios</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL ESPECÍFICO PARA CAMBIAR CONTRASEÑA -->
+    <div id="change-pass-modal-overlay"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-bold text-white mb-4">Cambiar Contraseña</h3>
+            <form id="form-change-pass" class="space-y-4">
+                <div>
+                    <label class="block mb-1 text-sm font-medium text-gray-300">Contraseña Actual</label>
+                    <input type="password" id="cp-current" class="w-full form-input p-2" required>
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-medium text-gray-300">Nueva Contraseña</label>
+                    <input type="password" id="cp-new" class="w-full form-input p-2" required>
+                </div>
+                <div>
+                    <label class="block mb-1 text-sm font-medium text-gray-300">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="cp-confirm" class="w-full form-input p-2" required>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" id="btn-cancel-cp" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -2271,64 +2334,158 @@
                 select.value = currentValue; // Restaurar valor si existía
             };
 
-            // --- LÓGICA PARA GESTIONAR USUARIOS ---
+            // ==========================================================
+            // --- LÓGICA GESTIÓN DE USUARIOS (ADMIN) ---
+            // ==========================================================
             const formAddUsuario = document.getElementById('form-add-usuario');
             const listaUsuarios = document.getElementById('lista-usuarios');
-            const loggedInUser = sessionStorage.getItem('loggedInUser'); // Get current user
+            const formUsuarioTitulo = document.getElementById('form-usuario-titulo');
+            const isEditingUserJson = document.getElementById('is-editing-user');
+            const editingUsernameOriginal = document.getElementById('editing-username-original');
+            const btnCancelEditUsuario = document.getElementById('btn-cancel-edit-usuario');
+            const passwordHint = document.getElementById('password-hint');
 
+            // Renderizar lista con Roles y Botón de Editar
             const renderUsuariosList = () => {
                 listaUsuarios.innerHTML = '';
                 users.forEach(user => {
-                    const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded';
-                    let deleteButtonHtml = '';
-                    // Only allow deleting users other than 'admin'
-                    if (user.username !== 'admin') {
-                        deleteButtonHtml = `
-                    <button class="p-1 text-red-400 hover:text-red-200" onclick="app.borrarUsuario('${user.username}')">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>`;
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-700 hover:bg-gray-750 transition-colors';
+
+                    let roleBadge = user.role === 'admin'
+                        ? '<span class="bg-blue-900 text-blue-200 text-xs px-2 py-0.5 rounded">Admin</span>'
+                        : '<span class="bg-gray-600 text-gray-200 text-xs px-2 py-0.5 rounded">Usuario</span>';
+
+                    let actionsHtml = '';
+                    // No permitir borrar ni editarse a sí mismo si es el admin logueado (opcional, pero recomendado)
+                    // Permitir editar al usuario 'admin' principal solo si eres 'admin'
+
+                    if (user.username !== 'admin' || sessionStorage.getItem('loggedInUser') === 'admin') {
+                        actionsHtml += `
+                            <button class="text-blue-400 hover:text-blue-200 mr-3" onclick="app.prepararEdicionUsuario('${user.username}')" title="Editar">
+                                <i data-lucide="edit" class="w-4 h-4"></i>
+                            </button>`;
                     }
-                    li.innerHTML = `<span>${user.username}</span> ${deleteButtonHtml}`;
-                    listaUsuarios.appendChild(li);
+
+                    if (user.username !== 'admin' && user.username !== sessionStorage.getItem('loggedInUser')) {
+                        actionsHtml += `
+                            <button class="text-red-400 hover:text-red-200" onclick="app.borrarUsuario('${user.username}')" title="Borrar">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="p-2">${user.username}</td>
+                        <td class="p-2">${roleBadge}</td>
+                        <td class="p-2 text-right">${actionsHtml}</td>
+                    `;
+                    listaUsuarios.appendChild(tr);
                 });
                 lucide.createIcons();
             };
 
+            // Resetear formulario usuarios
+            const resetFormUsuario = () => {
+                formAddUsuario.reset();
+                isEditingUserJson.value = 'false';
+                editingUsernameOriginal.value = '';
+                formUsuarioTitulo.textContent = 'Añadir Nuevo Usuario';
+                btnCancelEditUsuario.classList.add('hidden');
+                passwordHint.classList.add('hidden');
+                document.getElementById('new-password').required = true; // Pass obligatoria al crear
+                document.getElementById('new-username').disabled = false; // Permitir cambiar nombre si es nuevo
+            };
+
+            btnCancelEditUsuario.addEventListener('click', resetFormUsuario);
+
+            // Preparar formulario para Editar
+            app.prepararEdicionUsuario = (username) => {
+                const user = users.find(u => u.username === username);
+                if (!user) return;
+
+                document.getElementById('new-username').value = user.username;
+                // Si tu backend no devuelve el rol, asume 'user'. Asegúrate de que el GET /api/usuarios devuelva el campo 'role'
+                document.getElementById('new-user-role').value = user.role || 'user';
+
+                // Configurar modo edición
+                isEditingUserJson.value = 'true';
+                editingUsernameOriginal.value = user.username;
+
+                // UI ajustes
+                formUsuarioTitulo.textContent = `Editar Usuario: ${user.username}`;
+                btnCancelEditUsuario.classList.remove('hidden');
+
+                // Contraseña opcional al editar
+                const passInput = document.getElementById('new-password');
+                passInput.value = '';
+                passInput.required = false;
+                passwordHint.classList.remove('hidden');
+
+                // Opcional: Impedir cambiar el nombre de usuario (PK) al editar
+                // document.getElementById('new-username').disabled = true; 
+            };
+
+            // Submit Crear/Editar Usuario
             formAddUsuario.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const usernameInput = document.getElementById('new-username');
                 const passwordInput = document.getElementById('new-password');
-                const newUsername = usernameInput.value.trim();
-                const newPassword = passwordInput.value;
+                const roleInput = document.getElementById('new-user-role');
 
-                if (!newUsername || !newPassword) return;
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                const role = roleInput.value;
+                const isEditing = isEditingUserJson.value === 'true';
+                const originalUsername = editingUsernameOriginal.value;
 
-                // Generar Hash en cliente (para mantener consistencia con auth.js)
-                const newPasswordHash = CryptoJS.MD5(newPassword).toString();
+                if (!username) return;
+                // Si es nuevo, pass es obligatoria. Si edita, pass es opcional (vacío = no cambiar)
+                if (!isEditing && !password) {
+                    showModal({ title: "Error", message: "La contraseña es obligatoria para usuarios nuevos." });
+                    return;
+                }
+
+                // Preparar payload
+                const payload = {
+                    username: username,
+                    role: role
+                };
+
+                // Solo enviar hash si hay contraseña escrita (Crear o Resetear)
+                if (password) {
+                    payload.passwordHash = CryptoJS.MD5(password).toString();
+                }
 
                 try {
-                    const response = await fetch('/api/usuarios', {
-                        method: 'POST',
+                    let url = '/api/usuarios';
+                    let method = 'POST';
+
+                    if (isEditing) {
+                        url = `/api/usuarios/${originalUsername}`; // Tu backend debe soportar PUT
+                        method = 'PUT';
+                    }
+
+                    const response = await fetch(url, {
+                        method: method,
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: newUsername, passwordHash: newPasswordHash })
+                        body: JSON.stringify(payload)
                     });
 
                     const res = await response.json();
                     if (res.success) {
                         await loadDataFromDB(); // Recargar lista
-                        usernameInput.value = '';
-                        passwordInput.value = '';
-                        showModal({ title: "Éxito", message: `Usuario '${newUsername}' añadido.` });
+                        resetFormUsuario();
+                        showModal({ title: "Éxito", message: isEditing ? "Usuario actualizado." : "Usuario creado." });
                     } else {
-                        showModal({ title: "Error", message: res.error || "Error creando usuario." });
+                        showModal({ title: "Error", message: res.error || "Error en la operación." });
                     }
                 } catch (err) { console.error(err); }
             });
 
+            // Borrar usuario (Mantenemos la lógica existente)
             app.borrarUsuario = (usernameToDelete) => {
                 if (usernameToDelete === 'admin') {
-                    showModal({ title: "Error", message: "No se puede borrar el usuario administrador." });
+                    showModal({ title: "Error", message: "No se puede borrar el usuario administrador principal." });
                     return;
                 }
                 showModal({
@@ -2337,12 +2494,91 @@
                     type: 'confirm',
                     onConfirm: async () => {
                         try {
-                            await fetch(`/api/usuarios/${usernameToDelete}`, { method: 'DELETE' });
-                            await loadDataFromDB();
+                            const res = await fetch(`/api/usuarios/${usernameToDelete}`, { method: 'DELETE' });
+                            const data = await res.json();
+                            if (data.success) {
+                                await loadDataFromDB();
+                            } else {
+                                showModal({ title: "Error", message: data.error || "Error al borrar" });
+                            }
                         } catch (err) { console.error(err); }
                     }
                 });
             };
+
+
+            // ==========================================================
+            // --- LÓGICA CAMBIO DE CONTRASEÑA (USUARIO) ---
+            // ==========================================================
+            const btnChangePassMenu = document.getElementById('btn-user-change-pass');
+            const modalChangePassOverlay = document.getElementById('change-pass-modal-overlay');
+            const btnCancelCp = document.getElementById('btn-cancel-cp');
+            const formChangePass = document.getElementById('form-change-pass');
+
+            // Abrir Modal
+            if (btnChangePassMenu) {
+                btnChangePassMenu.addEventListener('click', () => {
+                    // Cerrar el menú dropdown si está abierto
+                    document.getElementById('user-dropdown').classList.add('hidden');
+                    formChangePass.reset();
+                    modalChangePassOverlay.classList.remove('hidden');
+                });
+            }
+
+            // Cerrar Modal
+            if (btnCancelCp) {
+                btnCancelCp.addEventListener('click', () => {
+                    modalChangePassOverlay.classList.add('hidden');
+                });
+            }
+
+            // Enviar Cambio de Contraseña
+            if (formChangePass) {
+                formChangePass.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+
+                    const currentPass = document.getElementById('cp-current').value;
+                    const newPass = document.getElementById('cp-new').value;
+                    const confirmPass = document.getElementById('cp-confirm').value;
+
+                    if (newPass !== confirmPass) {
+                        showModal({ title: "Error", message: "La nueva contraseña y la confirmación no coinciden." });
+                        return;
+                    }
+
+                    // Hashear antes de enviar
+                    const currentHash = CryptoJS.MD5(currentPass).toString();
+                    const newHash = CryptoJS.MD5(newPass).toString();
+
+                    const user = sessionStorage.getItem('loggedInUser');
+
+                    try {
+                        // Endpoint hipotético, debes implementarlo en tu backend
+                        const response = await fetch('/api/change-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: user,
+                                currentPasswordHash: currentHash,
+                                newPasswordHash: newHash
+                            })
+                        });
+
+                        const res = await response.json();
+
+                        if (res.success) {
+                            modalChangePassOverlay.classList.add('hidden');
+                            showModal({ title: "Éxito", message: "Tu contraseña ha sido actualizada." });
+                        } else {
+                            showModal({ title: "Error", message: res.error || "Contraseña actual incorrecta." });
+                        }
+
+                    } catch (error) {
+                        console.error(error);
+                        showModal({ title: "Error", message: "Error de conexión." });
+                    }
+                });
+            }
 
             // ==========================================================
             // --- LÓGICA DE IMPORTAR/EXPORTAR DATOS ---
