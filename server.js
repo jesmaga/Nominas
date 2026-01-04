@@ -365,22 +365,21 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                 anio: anio,
                 nomina: {
                     // Totales Principales
-                    salarioNeto: liquido.toFixed(2),
-                    totalDevengos: totalDevengado.toFixed(2),
-                    totalDeducciones: totalDeducciones.toFixed(2),
-                    totalCoste: "0.00", // No suele venir en la nómina del trabajador
+                    salarioNeto: extracted.liquido_percibir?.toFixed(2) || "0.00",
+                    totalDevengos: extracted.total_devengado?.toFixed(2) || "0.00",
+                    totalDeducciones: ((extracted.total_devengado || 0) - (extracted.liquido_percibir || 0)).toFixed(2),
 
                     // Bases
-                    baseCotizacion: baseCC.toFixed(2), // Usamos base CC como genérica
-                    salarioBasePeriodo: baseCC.toFixed(2), // Aproximación para visualización
-                    prorrataExtraPeriodo: "0.00",
+                    baseCotizacion: extracted.base_cc?.toFixed(2) || "0.00",
+                    salarioBasePeriodo: extracted.salario_base?.toFixed(2) || "0.00", // <--- AHORA SÍ LO TENEMOS
+                    prorrataExtraPeriodo: extracted.prorrata?.toFixed(2) || "0.00",
 
                     // Deducciones Trabajador
-                    deduccionCC: dedCC.toFixed(2),
-                    deduccionDesempleo: dedDesempleo.toFixed(2),
-                    deduccionFP: dedFP.toFixed(2),
-                    deduccionMEI: dedMEI.toFixed(2),
-                    deduccionIRPF: cuotaIRPF.toFixed(2),
+                    deduccionCC: extracted.cuota_cc?.toFixed(2) || (extracted.base_cc * 0.047).toFixed(2),
+                    deduccionDesempleo: extracted.cuota_desempleo?.toFixed(2) || (extracted.base_cp * 0.0155).toFixed(2),
+                    deduccionFP: extracted.cuota_fp?.toFixed(2) || (extracted.base_cp * 0.001).toFixed(2),
+                    deduccionMEI: extracted.cuota_mei?.toFixed(2) || (extracted.base_cp * 0.0013).toFixed(2),
+                    deduccionIRPF: extracted.cuota_irpf?.toFixed(2) || "0.00",
                     totalDeduccionesSS: (dedCC + dedDesempleo + dedFP + dedMEI).toFixed(2),
 
                     // Porcentajes (Strings para que coincida con tu formato)
@@ -403,7 +402,13 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
                     // Aportaciones Empresa (Normalmente no están en el PDF del trabajador, ponemos 0)
                     totalAportacionesEmpresa: "0.00",
                     porcCCEmpresa: "23.60",
-                    aportacionEmpresaCC: "0.00"
+                    aportacionEmpresaCC: "0.00",
+
+                    // Conceptos Calculados (Para mostrar Incentivos/CPP)
+                    conceptosCalculados: [
+                        { nombre: "Incentivo", importe: extracted.incentivo || 0 },
+                        { nombre: "CPP", importe: extracted.cpp || 0 }
+                    ].filter(c => c.importe > 0),
                 },
                 periodo: {
                     inicio: `${anio}-${String(mes).padStart(2, '0')}-01`,
