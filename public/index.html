@@ -251,8 +251,8 @@
                 </button>
             </div>
 
-            <div class="text-xs text-gray-600 text-center mt-2">
-                &copy; 2026 App Nóminas
+            <div id="footer-copyright" class="text-xs text-gray-600 text-center mt-2">
+                &copy; JMG App Nóminas
             </div>
         </div>
     </aside>
@@ -435,8 +435,8 @@
                                     class="form-input pl-9 p-2 text-sm w-full md:w-48">
                             </div>
                             <select id="empleados-rows-per-page" class="form-input p-2 text-sm w-20">
-                                <option value="5">5</option>
-                                <option value="10" selected>10</option>
+                                <option value="5" selected>5</option>
+                                <option value="10">10</option>
                                 <option value="20">20</option>
                             </select>
                         </div>
@@ -1163,8 +1163,8 @@
                         </div>
 
                         <select id="historial-rows-per-page" class="form-input p-2 text-sm w-20">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
+                            <option value="5" selected>5</option>
+                            <option value="10">10</option>
                             <option value="20">20</option>
                             <option value="50">50</option>
                         </select>
@@ -1923,7 +1923,7 @@
                 rawData: [],
                 filteredData: [],
                 currentPage: 1,
-                rowsPerPage: 10,
+                rowsPerPage: 5,
                 sortKey: 'nombre',
                 sortAsc: true,
                 searchTerm: ''
@@ -4084,7 +4084,7 @@
                 rawData: [],        // Datos originales de la API
                 filteredData: [],   // Datos filtrados y ordenados
                 currentPage: 1,
-                rowsPerPage: 10,
+                rowsPerPage: 5,
                 sortKey: 'fecha_creacion', // Columna por defecto
                 sortAsc: false,     // Orden descendente (más reciente primero)
                 searchTerm: ''
@@ -5046,6 +5046,13 @@
                         showPage(targetId);
                     });
                 });
+
+                // --- ACTUALIZAR AÑO EN EL PIE DE PÁGINA ---
+                const footer = document.getElementById('footer-copyright');
+                if (footer) {
+                    const currentYear = new Date().getFullYear();
+                    footer.innerHTML = `&copy; ${currentYear} JMG App Nóminas`;
+                }
 
                 // EXPONER VARIABLES GLOBALES PARA USO EN CONSOLA (TERMINAL)
                 window.appGlobals = {
