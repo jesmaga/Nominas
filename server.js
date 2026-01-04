@@ -110,7 +110,7 @@ const initDB = async () => {
 // Ejecutamos la inicialización al arrancar
 initDB();
 
-// --- FUNCIÓN AYUDANTE: PARSEAR NÚMEROS ESPAÑOLES ---
+/* --- Quitamos la función de extracción de pdf ---
 // --- FUNCIÓN MEJORADA PARA PARSEAR NÚMEROS ---
 const parseSpanishNumber = (str) => {
     if (!str) return 0;
@@ -433,7 +433,7 @@ app.post('/api/importar-pdf', upload.single('nominaPdf'), async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
+*/
 // --- 2. API ENDPOINTS (RUTAS) ---
 
 // --- LOGIN ---
