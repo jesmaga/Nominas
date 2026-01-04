@@ -700,24 +700,26 @@
 
             <!-- TAB ADMIN IRPF -->
             <div id="admin-irpf" class="admin-tab-content">
-                <div class="content-card max-w-6xl mx-auto">
+                <div class="content-card max-w-7xl mx-auto">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-2xl font-bold text-white">Configuración de IRPF</h3>
-                        <select id="irpf-anio-select" class="form-input p-2 w-32">
-                            <option value="2024">2024</option>
-                            <option value="2025" selected>2025</option>
-                            <option value="2026">2026</option>
-                        </select>
+                        <div class="flex items-center space-x-4">
+                            <label class="text-sm text-gray-400">Ejercicio Fiscal:</label>
+                            <select id="irpf-anio-select" class="form-input p-2 w-32 font-bold text-blue-400">
+                                <option value="2025">2025</option>
+                                <option value="2026" selected>2026</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <!-- COLUMNA 1: TRAMOS IRPF -->
-                        <div>
-                            <h4 class="text-lg font-semibold text-white mb-4">Tramos IRPF (Bruto Anual)</h4>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                        <div class="lg:col-span-1 border-r border-gray-700 pr-4">
+                            <h4 class="text-lg font-semibold text-blue-400 mb-4">A. Tramos Escala General</h4>
                             <div class="overflow-x-auto mb-4">
                                 <table class="w-full text-left border-collapse">
                                     <thead>
-                                        <tr class="text-gray-400 border-b border-gray-700">
+                                        <tr class="text-gray-400 border-b border-gray-700 text-xs uppercase">
                                             <th class="p-2">Desde (€)</th>
                                             <th class="p-2">Hasta (€)</th>
                                             <th class="p-2">%</th>
@@ -725,52 +727,111 @@
                                         </tr>
                                     </thead>
                                     <tbody id="tabla-irpf-body">
-                                        <!-- JS render lines -->
                                     </tbody>
                                 </table>
                             </div>
-                            <button type="button" id="btn-add-tramo-irpf" class="btn btn-secondary text-sm mb-4">+
-                                Añadir Tramo</button>
+                            <button type="button" id="btn-add-tramo-irpf" class="btn btn-secondary text-xs w-full py-2">
+                                <i data-lucide="plus" class="w-3 h-3 mr-2"></i> Añadir Tramo
+                            </button>
                         </div>
 
-                        <!-- COLUMNA 2: MÍNIMOS EXENTOS (MODELO 145) -->
-                        <div>
-                            <h4 class="text-lg font-semibold text-white mb-4">Mínimos Personales y Familiares</h4>
-                            <div class="space-y-3">
+                        <div class="lg:col-span-1 border-r border-gray-700 pr-4">
+                            <h4 class="text-lg font-semibold text-green-400 mb-4">B. Mínimos Personales</h4>
+                            <div class="space-y-3 bg-gray-800 p-4 rounded-lg">
                                 <div>
-                                    <label class="block text-sm text-gray-400">Mínimo Contribuyente (€)</label>
-                                    <input type="number" id="irpf-min-contribuyente" class="w-full form-input p-1"
-                                        value="5550">
+                                    <label class="block text-xs text-gray-400">Mínimo Contribuyente</label>
+                                    <input type="number" id="irpf-min-contribuyente"
+                                        class="w-full form-input p-1 text-right font-mono" step="0.01">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs text-gray-400">1º Hijo</label>
+                                        <input type="number" id="irpf-min-hijo1"
+                                            class="w-full form-input p-1 text-right font-mono" step="0.01">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-400">2º Hijo</label>
+                                        <input type="number" id="irpf-min-hijo2"
+                                            class="w-full form-input p-1 text-right font-mono" step="0.01">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-400">3º Hijo</label>
+                                        <input type="number" id="irpf-min-hijo3"
+                                            class="w-full form-input p-1 text-right font-mono" step="0.01">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-400">4º Hijo (+)</label>
+                                        <input type="number" id="irpf-min-hijo4"
+                                            class="w-full form-input p-1 text-right font-mono" step="0.01">
+                                    </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm text-gray-400">Por Descendiente (1º) (€)</label>
-                                    <input type="number" id="irpf-min-hijo1" class="w-full form-input p-1" value="2400">
+                                    <label class="block text-xs text-gray-400">Ascendiente (>65 años)</label>
+                                    <input type="number" id="irpf-min-ascendiente"
+                                        class="w-full form-input p-1 text-right font-mono" step="0.01">
                                 </div>
                                 <div>
-                                    <label class="block text-sm text-gray-400">Por Descendiente (2º) (€)</label>
-                                    <input type="number" id="irpf-min-hijo2" class="w-full form-input p-1" value="2700">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-400">Por Descendiente (3º) (€)</label>
-                                    <input type="number" id="irpf-min-hijo3" class="w-full form-input p-1" value="4000">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-400">Por Ascendiente (> 65) (€)</label>
-                                    <input type="number" id="irpf-min-ascendiente" class="w-full form-input p-1"
-                                        value="1150">
-                                </div>
-                                <div>
-                                    <label class="block text-sm text-gray-400">Plus Discapacidad (>= 33%) (€)</label>
-                                    <input type="number" id="irpf-min-discapacidad" class="w-full form-input p-1"
-                                        value="3000">
+                                    <label class="block text-xs text-gray-400">Discapacidad (33%-65%)</label>
+                                    <input type="number" id="irpf-min-discapacidad"
+                                        class="w-full form-input p-1 text-right font-mono" step="0.01">
                                 </div>
                             </div>
                         </div>
+
+                        <div class="lg:col-span-1">
+                            <h4 class="text-lg font-semibold text-purple-400 mb-4">C. Reducciones (Art. 20)</h4>
+                            <div class="space-y-3 bg-gray-800 p-4 rounded-lg">
+                                <div>
+                                    <label class="block text-xs text-gray-400">Gastos Generales (Fijo)</label>
+                                    <input type="number" id="irpf-gastos-generales"
+                                        class="w-full form-input p-1 text-right font-mono text-yellow-300"
+                                        value="2000.00">
+                                </div>
+                                <hr class="border-gray-600 my-2">
+                                <div>
+                                    <label class="block text-xs text-gray-400">Reducción Máxima (Rentas Bajas)</label>
+                                    <input type="number" id="irpf-red-maxima"
+                                        class="w-full form-input p-1 text-right font-mono" value="7302.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400">Umbral 1 (Rentas &le; X)</label>
+                                    <input type="number" id="irpf-umbral-1"
+                                        class="w-full form-input p-1 text-right font-mono" value="14852.00">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs text-gray-400">Umbral 2</label>
+                                        <input type="number" id="irpf-umbral-2"
+                                            class="w-full form-input p-1 text-right font-mono" value="17673.52">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-400">Coeficiente 1</label>
+                                        <input type="number" id="irpf-coef-1"
+                                            class="w-full form-input p-1 text-right font-mono" value="1.75">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs text-gray-400">Umbral 3</label>
+                                        <input type="number" id="irpf-umbral-3"
+                                            class="w-full form-input p-1 text-right font-mono" value="19747.50">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-400">Coeficiente 2</label>
+                                        <input type="number" id="irpf-coef-2"
+                                            class="w-full form-input p-1 text-right font-mono" value="1.14">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
                     <div class="mt-6 border-t border-gray-700 pt-4 flex justify-end">
-                        <button type="button" id="btn-save-irpf" class="btn btn-primary">Guardar Configuración
-                            IRPF</button>
+                        <button type="button" id="btn-save-irpf"
+                            class="btn btn-primary bg-blue-600 hover:bg-blue-700 px-8">
+                            <i data-lucide="save" class="w-4 h-4 mr-2"></i> Guardar Configuración Completa
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2048,6 +2109,62 @@
             let tablasIrpf = {}; // { "2024": [...], "2025": [...] }
             let parametrosIrpf = {}; // { "2025": { contribuyente: 5550, ... } }
 
+            // --- NUEVA FUNCIÓN: Generar opciones del desplegable de años dinámicamente ---
+            const renderIrpfYearDropdown = () => {
+                const select = document.getElementById('irpf-anio-select');
+                if (!select) return;
+
+                const currentYear = new Date().getFullYear();
+                const nextYear = currentYear + 1;
+
+                // 1. Recopilar todos los años que existen en la BD (tablas o parámetros)
+                const yearsWithData = new Set([
+                    ...Object.keys(tablasIrpf || {}).map(Number),
+                    ...Object.keys(parametrosIrpf || {}).map(Number)
+                ]);
+
+                // 2. Asegurar que el año actual y el siguiente siempre estén presentes
+                yearsWithData.add(currentYear);
+                yearsWithData.add(nextYear);
+
+                // 3. Convertir a array, ordenar numéricamente y filtrar inválidos
+                const sortedYears = Array.from(yearsWithData)
+                    .filter(y => !isNaN(y) && y > 0)
+                    .sort((a, b) => a - b);
+
+                // 4. Guardar selección actual (si había) para intentar restaurarla
+                const previousValue = parseInt(select.value);
+
+                // 5. Rellenar el Select
+                select.innerHTML = '';
+                sortedYears.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    // Por defecto seleccionamos el año actual si no había selección previa
+                    if (year === currentYear) option.selected = true;
+                    select.appendChild(option);
+                });
+
+                // Restaurar valor previo si sigue existiendo en la lista
+                if (previousValue && sortedYears.includes(previousValue)) {
+                    select.value = previousValue;
+                } else {
+                    select.value = currentYear; // Default: Año actual
+                }
+            };
+
+            const loadConfigIrpf = () => {
+                const storedConfig = JSON.parse(localStorage.getItem('configIrpf')) || {};
+                configIrpf = storedConfig;
+                for (const [key, defaultValue] of Object.entries(adminFields)) {
+                    const input = document.getElementById(key);
+                    if (input) {
+                        input.value = configIrpf[key] !== undefined ? configIrpf[key] : defaultValue;
+                    }
+                }
+            };
+
             const loadTablasIrpf = async () => {
                 try {
                     const [resTablas, resParam] = await Promise.all([
@@ -2067,6 +2184,10 @@
                         if (data) parametrosIrpf = data;
                     }
 
+                    // --- NUEVO: Renderizar el desplegable ahora que tenemos datos ---
+                    renderIrpfYearDropdown();
+                    // ---------------------------------------------------------------
+
                     renderTablaIrpf();
                     renderParametrosIrpf();
                 } catch (err) {
@@ -2076,20 +2197,37 @@
 
             const renderParametrosIrpf = () => {
                 const anio = selectIrpfAnio.value;
+                // Valores por defecto (Ejercicio 2026) si la BD está vacía
                 const params = parametrosIrpf[anio] || {
-                    contribuyente: 5550,
-                    hijo1: 2400,
-                    hijo2: 2700,
-                    hijo3: 4000,
-                    ascendiente: 1150,
-                    discapacidad: 3000
+                    contribuyente: 5550, hijo1: 2400, hijo2: 2700, hijo3: 4000, hijo4: 4500,
+                    ascendiente: 1150, discapacidad: 3000,
+                    // Nuevos valores por defecto (Art 20)
+                    gastos_generales: 2000,
+                    red_maxima: 7302.00,
+                    umbral_1: 14852.00,
+                    umbral_2: 17673.52,
+                    umbral_3: 19747.50,
+                    coef_1: 1.75,
+                    coef_2: 1.14
                 };
+
+                // Mínimos
                 document.getElementById('irpf-min-contribuyente').value = params.contribuyente;
                 document.getElementById('irpf-min-hijo1').value = params.hijo1;
                 document.getElementById('irpf-min-hijo2').value = params.hijo2;
                 document.getElementById('irpf-min-hijo3').value = params.hijo3;
+                document.getElementById('irpf-min-hijo4').value = params.hijo4 || 4500; // Nuevo campo
                 document.getElementById('irpf-min-ascendiente').value = params.ascendiente;
                 document.getElementById('irpf-min-discapacidad').value = params.discapacidad;
+
+                // Reducciones (Nuevos inputs)
+                document.getElementById('irpf-gastos-generales').value = params.gastos_generales || 2000;
+                document.getElementById('irpf-red-maxima').value = params.red_maxima || 7302;
+                document.getElementById('irpf-umbral-1').value = params.umbral_1 || 14852;
+                document.getElementById('irpf-umbral-2').value = params.umbral_2 || 17673.52;
+                document.getElementById('irpf-umbral-3').value = params.umbral_3 || 19747.50;
+                document.getElementById('irpf-coef-1').value = params.coef_1 || 1.75;
+                document.getElementById('irpf-coef-2').value = params.coef_2 || 1.14;
             };
 
             const renderTablaIrpf = () => {
@@ -2152,41 +2290,48 @@
                 btnSaveIrpf.addEventListener('click', async () => {
                     const anio = selectIrpfAnio.value;
 
-                    // Recopilar datos de la tabla visual (por si hubo ediciones inline)
+                    // 1. Guardar Tramos (Igual que antes)
                     const rows = tablaIrpfBody.querySelectorAll('tr');
                     const nuevosTramos = [];
-
                     rows.forEach(row => {
                         const desde = parseFloat(row.querySelector('.irpf-desde').value) || 0;
                         const hastaVal = row.querySelector('.irpf-hasta').value;
                         const hasta = hastaVal === '' ? null : parseFloat(hastaVal);
                         const porcentaje = parseFloat(row.querySelector('.irpf-porcentaje').value) || 0;
-
                         nuevosTramos.push({ desde, hasta, porcentaje });
                     });
-
-                    // Validación básica
                     nuevosTramos.sort((a, b) => a.desde - b.desde);
                     tablasIrpf[anio] = nuevosTramos;
 
-                    // Recopilar Mínimos Exentos
+                    // 2. Guardar Parámetros (Mínimos + Reducciones)
                     const nuevosParams = {
+                        // Mínimos
                         contribuyente: parseFloat(document.getElementById('irpf-min-contribuyente').value) || 0,
                         hijo1: parseFloat(document.getElementById('irpf-min-hijo1').value) || 0,
                         hijo2: parseFloat(document.getElementById('irpf-min-hijo2').value) || 0,
                         hijo3: parseFloat(document.getElementById('irpf-min-hijo3').value) || 0,
+                        hijo4: parseFloat(document.getElementById('irpf-min-hijo4').value) || 0,
                         ascendiente: parseFloat(document.getElementById('irpf-min-ascendiente').value) || 0,
-                        discapacidad: parseFloat(document.getElementById('irpf-min-discapacidad').value) || 0
+                        discapacidad: parseFloat(document.getElementById('irpf-min-discapacidad').value) || 0,
+
+                        // Reducciones
+                        gastos_generales: parseFloat(document.getElementById('irpf-gastos-generales').value) || 0,
+                        red_maxima: parseFloat(document.getElementById('irpf-red-maxima').value) || 0,
+                        umbral_1: parseFloat(document.getElementById('irpf-umbral-1').value) || 0,
+                        umbral_2: parseFloat(document.getElementById('irpf-umbral-2').value) || 0,
+                        umbral_3: parseFloat(document.getElementById('irpf-umbral-3').value) || 0,
+                        coef_1: parseFloat(document.getElementById('irpf-coef-1').value) || 0,
+                        coef_2: parseFloat(document.getElementById('irpf-coef-2').value) || 0
                     };
                     parametrosIrpf[anio] = nuevosParams;
 
-                    // GUARDAR AMBOS
+                    // Enviar a BD
                     try {
                         await Promise.all([
                             guardarConfigEnBD('tablas_irpf', tablasIrpf),
                             guardarConfigEnBD('parametros_irpf', parametrosIrpf)
                         ]);
-                        showModal({ title: 'Éxito', message: 'Configuración IRPF (Tramos y Mínimos) guardada correctamente.' });
+                        showModal({ title: 'Éxito', message: 'Tramos, Mínimos y Reducciones guardados correctamente.' });
                     } catch (err) {
                         showModal({ title: 'Error', message: 'Error guardando config IRPF: ' + err.message });
                     }
@@ -2770,121 +2915,125 @@
 
             const calcularIRPFRecomendado = (brutoMensual, pagas = 14, empleado = null, acumulados = { totalIngresos: 0, totalRetenido: 0 }, mesActual = 1) => {
                 const anioActual = new Date().getFullYear().toString();
+                const paramsBD = parametrosIrpf[anioActual];
 
-                // Cargar Tablas y Parámetros
-                const tramos = tablasIrpf[anioActual] || tablasIrpf["2024"] || Object.values(tablasIrpf)[0] || [];
-                const minParams = parametrosIrpf[anioActual] || {
-                    contribuyente: 5550, hijo1: 2400, hijo2: 2700, hijo3: 4000, ascendiente: 1150, discapacidad: 3000
-                };
+                // FALLBACKS DE SEGURIDAD (Por si la BD está vacía, usamos valores 2026)
+                const P = paramsBD || {};
+                const gastosGeneralesDef = P.gastos_generales || 2000;
 
+                // Variables Reducción Art 20
+                const redMax = P.red_maxima || 7302.00;
+                const umbral1 = P.umbral_1 || 14852.00;
+                const umbral2 = P.umbral_2 || 17673.52;
+                const umbral3 = P.umbral_3 || 19747.50;
+                const coef1 = P.coef_1 || 1.75;
+                const coef2 = P.coef_2 || 1.14;
+                // Calculamos la base intermedia del tramo 3 dinámicamente para que cuadre la fórmula
+                // Fórmula legal: 2.364,34 - 1,14 * (RNT - 17.673,52)
+                const baseTramo3 = (redMax - (coef1 * (umbral2 - umbral1))); // Debería dar aprox 2364.34
+
+                const tramos = tablasIrpf[anioActual] || tablasIrpf["2025"] || [];
                 if (tramos.length === 0) return null;
 
-                // --- 1. PROYECCIÓN DE INGRESOS (Regularización) ---
+                // --- PROYECCIÓN ---
                 const ingresosAcumulados = acumulados.totalIngresos || 0;
                 const retencionesAcumuladas = acumulados.totalRetenido || 0;
-
-                // Meses restantes incluyendo el actual
-                // Si mesActual = 1 (Enero), proyectamos 12 meses.
                 const mesesRestantes = 12 - mesActual + 1;
-
-                // Bruto Anual Teórico del Puesto
                 const anualTeoricoPuesto = brutoMensual * pagas;
-                // Ingreso Mensual Promedio (Prorrateado) para estimación
                 const mensualPromedio = anualTeoricoPuesto / 12;
 
-                let totalEstimado = 0;
-                if (ingresosAcumulados > 0 || mesActual > 1) {
-                    // Regularización: Lo que ya gané + Lo que espero ganar
-                    totalEstimado = ingresosAcumulados + (mensualPromedio * mesesRestantes);
-                } else {
-                    // Inicio de año: Proyección estándar
-                    totalEstimado = anualTeoricoPuesto;
+                let totalRetribucionAnual = (ingresosAcumulados > 0 || mesActual > 1)
+                    ? ingresosAcumulados + (mensualPromedio * mesesRestantes)
+                    : anualTeoricoPuesto;
+
+                // --- GASTOS DEDUCIBLES ---
+                const estimacionSS = totalRetribucionAnual * 0.0635;
+                let RNT = totalRetribucionAnual - estimacionSS - gastosGeneralesDef;
+                if (RNT < 0) RNT = 0;
+
+                // --- REDUCCIÓN ART 20 (DINÁMICA) ---
+                let reduccionArt20 = 0;
+
+                if (RNT <= umbral1) {
+                    reduccionArt20 = redMax;
+                } else if (RNT > umbral1 && RNT <= umbral2) {
+                    reduccionArt20 = redMax - (coef1 * (RNT - umbral1));
+                } else if (RNT > umbral2 && RNT < umbral3) {
+                    reduccionArt20 = baseTramo3 - (coef2 * (RNT - umbral2));
                 }
 
-                // Gastos Generales (Reducción por rendimientos del trabajo estándar)
-                const gastosGenerales = 2000;
-                const baseImponible = Math.max(0, totalEstimado - gastosGenerales);
+                reduccionArt20 = Math.round(reduccionArt20 * 100) / 100;
+                let baseLiquidable = Math.max(0, RNT - reduccionArt20);
 
-                // --- 2. MÍNIMO PERSONAL Y FAMILIAR ---
-                let minimoPersonalFamiliar = minParams.contribuyente;
+                // --- MÍNIMOS (DINÁMICOS) ---
+                let minimoPersonalFamiliar = P.contribuyente || 5550;
+
+                if (empleado && empleado.anioNacimiento) {
+                    const edad = new Date().getFullYear() - parseInt(empleado.anioNacimiento);
+                    if (edad >= 65) minimoPersonalFamiliar += 1150;
+                    if (edad >= 75) minimoPersonalFamiliar += 1400;
+                }
+
                 let infoFam = "Soltero/a sin cargas";
-
                 if (empleado) {
                     const hijos = parseInt(empleado.hijos) || 0;
                     const ascendientes = parseInt(empleado.ascendientes) || 0;
                     const disc = parseFloat(empleado.discapacidad) || 0;
 
                     let extraHijos = 0;
-                    if (hijos >= 1) extraHijos += minParams.hijo1;
-                    if (hijos >= 2) extraHijos += minParams.hijo2;
-                    if (hijos >= 3) extraHijos += (minParams.hijo3 * (hijos - 2));
+                    if (hijos >= 1) extraHijos += P.hijo1 || 2400;
+                    if (hijos >= 2) extraHijos += P.hijo2 || 2700;
+                    if (hijos >= 3) extraHijos += P.hijo3 || 4000;
+                    if (hijos >= 4) extraHijos += ((P.hijo4 || 4500) * (hijos - 3));
 
-                    const extraAsc = ascendientes * minParams.ascendiente;
-                    const extraDisc = (disc >= 33) ? minParams.discapacidad : 0; // Simplificado
+                    const extraAsc = ascendientes * (P.ascendiente || 1150);
+                    let extraDisc = 0;
+                    if (disc >= 33 && disc < 65) extraDisc = P.discapacidad || 3000;
+                    if (disc >= 65) extraDisc = 9000;
+                    if (disc >= 65 || (disc >= 33 && empleado.movilidadReducida)) extraDisc += 3000;
 
                     minimoPersonalFamiliar += extraHijos + extraAsc + extraDisc;
-
-                    if (hijos > 0 || ascendientes > 0 || disc > 0) {
-                        infoFam = `${hijos} hijos, ${ascendientes} asc., Disc. ${disc}%`;
-                    }
+                    if (hijos > 0 || ascendientes > 0 || disc > 0) infoFam = `${hijos} hijos, ${ascendientes} asc.`;
                 }
 
-                // --- 3. CÁLCULO DE CUOTA LÍQUIDA ANUAL ---
-                const calcularCuota = (base, _tramos) => {
+                // --- CÁLCULO CUOTA ---
+                const calcularCuotaEscala = (base, _tramos) => {
                     let cuota = 0;
                     const tramosOrdenados = [..._tramos].sort((a, b) => a.desde - b.desde);
-
                     for (const t of tramosOrdenados) {
                         if (base > t.desde) {
-                            const limiteSuperior = t.hasta || Infinity;
-                            const baseTramo = Math.min(base, limiteSuperior) - t.desde;
-                            cuota += baseTramo * (t.porcentaje / 100);
+                            const limiteSuperior = (t.hasta && t.hasta > 0) ? t.hasta : Infinity;
+                            const finTramo = Math.min(base, limiteSuperior);
+                            cuota += (finTramo - t.desde) * (t.porcentaje / 100);
                         }
                     }
                     return cuota;
                 };
 
-                const cuota1 = calcularCuota(baseImponible, tramos);
-                const cuota2 = calcularCuota(minimoPersonalFamiliar, tramos);
-                const cuotaLiquidaAnual = Math.max(0, cuota1 - cuota2);
+                const cuota1 = calcularCuotaEscala(baseLiquidable, tramos);
+                const cuota2 = calcularCuotaEscala(minimoPersonalFamiliar, tramos);
+                let cuotaLiquidaAnual = Math.max(0, cuota1 - cuota2);
 
-                // --- 4. TIPO A APLICAR (REGULARIZACIÓN) ---
-                // Cuota que falta por pagar
-                let cuotaRestante = cuotaLiquidaAnual - retencionesAcumuladas;
-                if (cuotaRestante < 0) cuotaRestante = 0; // Si ya ha pagado de más, 0 retención (se regulariza en Renta)
-
-                // Base Futura sobre la que distribuir la cuota restante
+                let cuotaRestante = Math.max(0, cuotaLiquidaAnual - retencionesAcumuladas);
                 const baseFutura = mensualPromedio * mesesRestantes;
 
                 let nuevoTipo = 0;
-                if (baseFutura > 0) {
-                    nuevoTipo = (cuotaRestante / baseFutura) * 100;
-                }
+                if (baseFutura > 0) nuevoTipo = (cuotaRestante / baseFutura) * 100;
 
-                // --- 5. REGLAS MÍNIMAS (TEMPORAL) ---
-                let infoExtra = "";
-                if (ingresosAcumulados > 0) infoExtra = `(Regularizado)`;
-
-                if (empleado && empleado.tipoContrato) {
-                    const tipo = empleado.tipoContrato.toLowerCase();
-                    // Palabras clave para contratos temporales
-                    if (tipo.includes("temporal") || tipo.includes("obra") || tipo.includes("determinado") || tipo.includes("circunstancias")) {
-                        if (nuevoTipo < 2.00) {
-                            nuevoTipo = 2.00;
-                            infoExtra += " (Mín. Temporal)";
-                        }
-                    }
+                let infoExtra = (ingresosAcumulados > 0) ? "(Regularizado)" : "";
+                if (empleado?.tipoContrato?.toLowerCase().match(/temporal|obra|eventual/) && nuevoTipo < 2) {
+                    nuevoTipo = 2;
+                    infoExtra += " (Mín. Temporal)";
                 }
 
                 return {
-                    tipo: nuevoTipo.toFixed(2),
+                    tipo: (Math.floor(nuevoTipo * 100) / 100).toFixed(2),
                     c1: cuota1.toFixed(2),
                     c2: cuota2.toFixed(2),
                     minimo: minimoPersonalFamiliar,
-                    info: infoFam + " " + infoExtra
+                    info: `${infoFam} ${infoExtra}`
                 };
             };
-
             // REEMPLAZAR la función app.generarCertificado existente por esta versión:
 
             app.generarCertificado = async (empleadoId) => {
