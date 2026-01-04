@@ -3386,9 +3386,11 @@
                 manualModeToggle.addEventListener('change', (e) => {
                     if (e.target.checked) {
                         manualModeFields.classList.remove('hidden');
-                        if (fieldsetBaja) fieldsetBaja.classList.add('opacity-50', 'pointer-events-none');
+                        // ELIMINA O COMENTA ESTA LÍNEA PARA QUE NO BLOQUEE LAS FECHAS DE BAJA:
+                        // if (fieldsetBaja) fieldsetBaja.classList.add('opacity-50', 'pointer-events-none'); 
                     } else {
                         manualModeFields.classList.add('hidden');
+                        // Y ESTA TAMBIÉN PUEDES QUITARLA O DEJARLA (no hace daño si quitaste la anterior):
                         if (fieldsetBaja) fieldsetBaja.classList.remove('opacity-50', 'pointer-events-none');
                     }
                 });
@@ -3491,7 +3493,7 @@
 
                         ${otrosDevengosHtml}
                         ${nomina.complementoEnfermedadEmpresa > 0 ? `<dt>Complemento Empresa por Baja</dt><dd>${nomina.complementoEnfermedadEmpresa} €</dd>` : ''}
-                        ${nomina.diasBajaEnPeriodo > 0 ? `<dt>Prestación por Baja (${nomina.diasBajaEnPeriodo} días)</dt><dd>${nomina.prestacionEnfermedadLegal} €</dd>` : ''}
+                        ${nomina.diasBajaEnPeriodo > 0 || parseFloat(nomina.prestacionEnfermedadLegal) > 0 ? `<dt>Prestación por Baja (${nomina.diasBajaEnPeriodo > 0 ? nomina.diasBajaEnPeriodo : 'Manual'} días)</dt><dd>${nomina.prestacionEnfermedadLegal} €</dd>` : ''}
                         <dt class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">A. TOTAL DEVENGADO</dt>
                         <dd class="border-t border-gray-600 pt-2 mt-2 font-bold text-gray-200">${nomina.totalDevengos} €</dd>
                     </dl>
