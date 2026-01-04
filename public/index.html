@@ -1585,7 +1585,7 @@
             const listaEmpleados = document.querySelector('#lista-empleados tbody');
             const formEmpleadoTitulo = document.getElementById('form-empleado-titulo');
             const empleadoIdInput = document.getElementById('empleado-id');
-            const cancelarEdicionEmpleadoBtn = document.getElementById('cancelar-edicion-empleado');
+            //const cancelarEdicionEmpleadoBtn = document.getElementById('cancelar-edicion-empleado');
             const formNomina = document.getElementById('form-nomina');
             const nominaEmpleadoSelect = document.getElementById('nomina-empleado');
             const nominaResultadoContainer = document.getElementById('nomina-resultado-container');
@@ -2122,7 +2122,7 @@
                 document.getElementById('empleado-ascendientes').value = "0";
 
                 formEmpleadoTitulo.textContent = 'Añadir Nuevo Empleado';
-                cancelarEdicionEmpleadoBtn.classList.add('hidden');
+                //cancelarEdicionEmpleadoBtn.classList.add('hidden');
 
                 // FUERZA EL RESET DEL BOTÓN
                 const submitBtn = formEmpleado.querySelector('button[type="submit"]');
@@ -2191,7 +2191,7 @@
                 // Nota: Al usar resetFormEmpleado en el success, no necesitamos un finally que sobrescriba
             });
 
-            cancelarEdicionEmpleadoBtn.addEventListener('click', resetFormEmpleado);
+            //cancelarEdicionEmpleadoBtn.addEventListener('click', resetFormEmpleado);
 
             app.editarEmpleado = (id) => {
                 const empleado = empleados.find(e => e.id === id);
@@ -2214,7 +2214,7 @@
                     document.getElementById('empleado-ascendientes').value = empleado.ascendientes || '0';
 
                     formEmpleadoTitulo.textContent = `Editar Empleado: ${empleado.nombre}`;
-                    cancelarEdicionEmpleadoBtn.classList.remove('hidden');
+                    //cancelarEdicionEmpleadoBtn.classList.remove('hidden');
                 }
             };
 
